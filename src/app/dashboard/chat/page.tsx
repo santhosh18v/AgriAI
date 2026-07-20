@@ -3,7 +3,7 @@ import { AIChat } from "@/components/dashboard/AIChat";
 
 export default function ChatPage() {
   return (
-    <DashboardShell title="AI Advisor" subtitle="Chat with Gemini and Groq-powered farming experts">
+    <DashboardShell title="AI Advisor" subtitle="Chat with Qwen3 Local and Gemini farming experts">
       <AIChat />
     </DashboardShell>
   );
