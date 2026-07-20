@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
-import { fastAnalysisWithGroq } from "@/lib/groq";
+import { chatWithOllama } from "@/lib/ollama";
 import { chatWithGemini } from "@/lib/gemini";
 
 export async function POST(request: NextRequest) {
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { message, provider = "groq", history } = await request.json();
+    const { message, provider = "ollama", history } = await request.json();
 
     if (!message) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
       ? `Previous conversation:\n${contextHistory}\n\nCurrent question: ${message}`
       : message;
 
-    if (provider === "groq") {
-      response = await fastAnalysisWithGroq(fullMessage);
+    if (provider === "ollama") {
+      response = await chatWithOllama(fullMessage);
     } else {
       response = await chatWithGemini(fullMessage);
     }

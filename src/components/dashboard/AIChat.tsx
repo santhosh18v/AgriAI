@@ -23,7 +23,7 @@ export function AIChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [provider, setProvider] = useState<"groq" | "gemini">("groq");
+  const [provider, setProvider] = useState<"ollama" | "gemini">("ollama");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,14 +89,14 @@ export function AIChat() {
 
         <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
           <button
-            onClick={() => setProvider("groq")}
+            onClick={() => setProvider("ollama")}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-              provider === "groq" ? "bg-orange-500/20 text-orange-400" : "text-white/40"
+              provider === "ollama" ? "bg-orange-500/20 text-orange-400" : "text-white/40"
             )}
           >
             <Zap className="w-3.5 h-3.5" />
-            Groq
+            Qwen3 Local
           </button>
           <button
             onClick={() => setProvider("gemini")}
@@ -164,8 +164,8 @@ export function AIChat() {
                 {msg.content}
                 {msg.provider && (
                   <p className="text-[10px] text-white/30 mt-2 flex items-center gap-1">
-                    {msg.provider === "groq" ? <Zap className="w-3 h-3" /> : <Brain className="w-3 h-3" />}
-                    {msg.provider === "groq" ? "Groq Llama 3" : "Gemini"}
+                    {msg.provider === "ollama" ? <Zap className="w-3 h-3" /> : <Brain className="w-3 h-3" />}
+                    {msg.provider === "ollama" ? "Qwen3 8B Local" : "Gemini"}
                   </p>
                 )}
               </div>
