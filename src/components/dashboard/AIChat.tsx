@@ -54,7 +54,10 @@ export function AIChat() {
       if (!res.ok) {
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: "Sorry, I couldn't process that. Please try again." },
+          {
+            role: "assistant",
+            content: data?.error || "Sorry, I couldn't process that. Please try again.",
+          },
         ]);
         return;
       }
