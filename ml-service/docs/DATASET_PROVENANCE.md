@@ -443,6 +443,185 @@ duplicates. No count above changes as a result.
 **M3B-3 (split generation) has not started.** No `train.csv`, `val.csv`,
 or `test.csv` exists anywhere in the repository as of this milestone.
 
+## Milestone M3B-3: deterministic grouped split generation
+
+**Status: review artifact, NOT finally approved.** `training/build_splits.py`
+mechanically applies the M3B-2 decisions above — it makes no new grouping
+decision. Final leakage sign-off is Milestone M3B-4; the status below does
+not constitute that sign-off.
+
+**Grouping precedence applied** (highest first): (1) authoritative
+`leaf_id` from the M3A `leaf-map.json` join; (2) approved Tomato
+filename-family group (`th::`/`tlb::`, M3B-2 policy); (3) approved pHash
+group — **not used**, since every in-scope within-class pHash cluster is
+already covered by (1) or (2), see below; (4) quarantine. No singleton
+fallback, no inferred grouping, no Corn pHash groups (`needs_more_review`).
+
+**Duplicate collapsing**: the 14 exact-duplicate images recorded in M3A's
+`exact_hash_report.json` are excluded entirely (only the representative
+image is eligible), per Milestone M3B-3 instruction.
+
+**Allocation algorithm**: for each class, groups are sorted largest-first
+(ties broken by ascending `group_key`) and placed one at a time onto
+whichever split is currently furthest below its 70/15/15 image target
+(deficit-driven greedy bin-packing). Ties in deficit are broken by (a)
+fewer groups already assigned to that split, then (b) the fixed priority
+order train > val > test. This chain of deterministic tie-breakers always
+resolves to exactly one split, so the algorithm never actually needs to
+draw randomly — **seed 42** is recorded per the M3B-3 contract and would
+only be exercised if a genuine tie survived both tie-breakers, which does
+not occur on this dataset. Verified byte-identical across two independent
+clean runs (`train.csv`, `val.csv`, `test.csv`, and all four analytical
+`split_*.json` reports).
+
+**Manifest counts** (`ml-service/data/splits/`, gitignored):
+
+| Manifest | Rows | SHA-256 |
+|---|---:|---|
+| train.csv | 4,642 | `5c73e055655cb768788c93b6700b827219b18d8c196ed4ccbfcb0cf310878b9c` |
+| val.csv | 1,001 | `a801164d382d76d4c066cd9eca664744f9691741ef8dc0fb9dd8fc424938d054` |
+| test.csv | 991 | `424969bd453ea8e61958f6fbc6538016b21ae692045dd079f2b7ff4ddbadb462` |
+| **Total** | **6,634** | |
+
+Reconciliation: 6,652 active-scope images − 14 duplicates − 4 quarantined
+= 6,634 final rows. Verified.
+
+**Per-class achieved percentages** (target 70/15/15): all 6 classes landed
+within ±0.4 percentage points of target on every split (e.g. Tomato Late
+Blight 70.02/14.99/14.99; Potato Early Blight 70.0/15.2/14.8) — full detail
+in `ml-service/data/reports/split_summary.json`.
+
+**Minimum-check outcome — Potato Healthy FAILED.** All 5 other classes met
+every applicable minimum (val/test ≥30 images and ≥15 groups). **Potato
+Healthy** — the only class with exclusively `leaf_id`-based grouping (38
+groups, all size 4, 152 images total; no Tomato-style filename-family or
+pHash grouping is approved for Potato) — achieved val = 24 images/6 groups
+and test = 24 images/6 groups against a required minimum of 20
+images/**8 groups** each. The image minimums pass; the **group** minimums
+do not. This is a structural feasibility limit, not an algorithm defect:
+satisfying train ≥100 images (≥25 groups) and val/test ≥8 groups each
+simultaneously requires ≥41 groups, but only 38 exist. `split_summary.json`
+records `"status": "FAILED_MINIMUM_REQUIREMENTS"`, `"approved": false`, and
+a `failure_report` with the exact shortfall. Manifests were still generated
+for review (per M3B-3 instruction), but **this split must not be used for
+training until M3B-4 resolves the Potato Healthy shortfall** (e.g. by
+approving additional grouping evidence for Potato Healthy, or by revising
+its minimum).
+
+**Disclosed residual limitation — pHash near-duplicate split risk.** A
+non-blocking diagnostic (`split_input_integrity.json` →
+`phash_consistency_preview`) checked, for every within-class pHash cluster
+already on record from M3A/M3B-2, whether both members landed in the same
+final group after this build. **3 of 11 in-scope clusters did not**:
+`phash-2623` and `phash-4306` (Potato — the two near-duplicate images in
+each pair carry *different* authoritative `leaf_id`s) and `phash-6432`
+(Tomato Late Blight — `GHLB2 Leaf 8836` and `GHLB2 Leaf 8837` are adjacent
+leaf numbers, hence different approved filename groups). These pairs
+(Hamming distance ≤4) may therefore be assigned to different splits. No
+merge was performed — doing so would be a new, unapproved pHash grouping,
+which M3B-3 is explicitly not authorized to create. Flagged here for
+M3B-4 review, not fixed.
+
+**Reproducibility**: `training/check_leakage.py` was extended for this
+milestone (schema now includes `class_index`; added checks for
+out-of-scope-class rows, quarantined-image presence, path existence, and
+per-split active-class coverage). Run against the generated manifests:
+zero SHA-256 overlap, zero group_key overlap, no out-of-scope or
+quarantined rows, all paths exist, all 6 active classes present in all 3
+splits, schema correct. This is a **preview** check only — see the M3B-4
+note above.
+
+## Milestone M3B-3A: Potato Healthy exception + similarity guards (supersedes M3B-3's FAILED status)
+
+**Status: review artifact, NOT finally approved.** M3B-3A resolved the two
+issues M3B-3 disclosed — the Potato Healthy minimum shortfall and the 3
+pHash cross-split risks — via explicit user decisions, then regenerated
+the manifests. Final leakage sign-off remains Milestone M3B-4.
+
+**1. Potato Healthy class-specific minimum exception (approved).** The
+general minimum (val/test ≥8 groups) was confirmed mathematically
+infeasible for this class (see M3B-3 section above: 25+8+8=41 > 38
+available groups). Approved exception, scoped to Potato Healthy only —
+**the general minimums for the other 5 classes are unchanged**:
+
+| | Train | Validation | Test |
+|---|---|---|---|
+| Potato Healthy (approved exception) | ≥100 img, ≥15 grp | ≥20 img, **≥6 grp** | ≥20 img, **≥6 grp** |
+| General (other 5 classes, unchanged) | — | ≥30 img, ≥15 grp | ≥30 img, ≥15 grp |
+
+Approved allocation (**Option A** from M3B-3A analysis): train 104
+images/26 groups, validation 24 images/6 groups, test 24 images/6 groups —
+now `PASS`es its exception on every split.
+
+**Disclose wherever Potato Healthy metrics are reported**: this class has
+only **38 authoritative physical-leaf groups** in total; validation and
+test each contain only **6 independent leaf groups**. Potato Healthy
+precision, recall, and F1 therefore carry **high uncertainty** — with only
+6 independent groups per split, one misclassified held-out leaf-group can
+substantially swing the class's own metric, and because macro-F1 weighs
+all 6 classes equally, **macro-F1 must be interpreted cautiously** whenever
+Potato Healthy is included (it is ~2.3% of total images but carries 1/6 of
+macro-F1's weight).
+
+**2. Similarity guards (approved).** `training/similarity_guards_v1.json`
+(new tracked, approved file) records 3 `similarity_guard_group` split-safety
+constraints, one per residual pHash cluster identified in M3B-3:
+
+| Guard | Class | Original groups linked | pHash distance | Reason |
+|---|---|---|---:|---|
+| `similarity-guard-phash-2623` | Potato Early Blight | `...:::157.0`, `...:::164.0` | 4 | Visually near-identical; different authoritative leaf_ids |
+| `similarity-guard-phash-4306` | Potato Late Blight | `...:::207.0`, `...:::171.0` | 4 | Visually more distinct of the three; applied uniformly for a consistent, auditable policy |
+| `similarity-guard-phash-6432` | Tomato Late Blight | `tlb::GHLB2::Leaf8836`, `tlb::GHLB2::Leaf8837` | 4 | Near-identical; adjacent leaf numbers with no authoritative leaf_id; **was actually cross-split (train/val) before this guard** |
+
+A `similarity_guard_group` is a **split-safety constraint only**: it does
+**not** assert the linked images share one physical leaf, does **not**
+overwrite or replace any authoritative `leaf_id`, and does **not** replace
+any approved Tomato filename-family `group_key`. Every image's original
+`group_key`/`group_source` is unchanged in the manifests; a new
+`similarity_guard_group` column is added alongside them (empty when no
+guard applies).
+
+**Allocation-algorithm change**: `build_splits.py` now allocates over
+**components** — one original group when no guard applies, or the union of
+every original group sharing one approved guard when one does — guaranteeing
+all of a guard's linked groups land in the same split. With no guard
+present, a component is a singleton and behaves exactly as before (verified:
+the other 5 classes' allocations are unaffected in substance; only
+`phash-6432`'s class, Tomato Late Blight, and the two Potato classes holding
+a guard could move groups, and did so only for the guarded groups
+themselves).
+
+**Verification — `phash-6432` no longer crosses splits.** The
+`phash_consistency_preview` diagnostic (re-run post-guard) now reports
+**0 of 11** in-scope clusters with cross-split risk (down from 3). All
+three guarded pairs — including `phash-6432`, previously split
+train/validation — now land together in one split each.
+
+**Regenerated manifest counts** (`ml-service/data/splits/`, gitignored;
+same total row count as before — guards only change *which* split a group
+lands in, not eligibility):
+
+| Manifest | Rows | SHA-256 |
+|---|---:|---|
+| train.csv | 4,642 | `3bec912c0efb7a22eb66b388c364be6ab784ce3e8637ffe716c0804655b99a79` |
+| val.csv | 1,001 | `85f86dec9e81566b19d0654559f6b56c11d4b7086f3d5b8d244e00cae91dd91f` |
+| test.csv | 991 | `3d0ee43d9edc836eefadb71bf178d55d3e60817053efa5f9f5a52cd04c284abb` |
+| **Total** | **6,634** | |
+
+Verified byte-identical across two independent clean runs (all 3 CSVs plus
+all 4 analytical `split_*.json` reports).
+
+**`split_summary.json` status: `"all_minimums_met"`** — all 6 classes now
+pass their applicable minimum (general or Potato-Healthy-exception).
+`"approved": false` still — M3B-3A does not perform M3B-4 sign-off.
+
+**`check_leakage.py` extended further**: CSV schema now includes
+`similarity_guard_group` (7 columns); added checks for zero
+`similarity_guard_group` overlap across splits, correct representation and
+single-split confinement of every approved guard, non-overwritten original
+`group_key`s, and both the Potato Healthy exception and the general
+minimums (read directly from the manifests). All checks pass.
+
 ## Storage location
 
 `ml-service/data/raw/plantvillage-source/` — upstream directory structure
