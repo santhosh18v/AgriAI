@@ -622,6 +622,74 @@ single-split confinement of every approved guard, non-overwritten original
 `group_key`s, and both the Potato Healthy exception and the general
 minimums (read directly from the manifests). All checks pass.
 
+## Milestone M3B-4: final independent leakage validation and sign-off
+
+**Final status: `approved_for_training`.**
+**Validated: 2026-07-25 (UTC).**
+
+This milestone independently re-validated the M3B-3A manifests as committed
+— it did not regenerate them for use, and did not trust
+`build_splits.py`'s own generated reports as ground truth. A new read-only
+tool, `training/validate_splits.py`, re-derives the expected class/group/
+guard assignment for every eligible image directly from source evidence
+(`leaf-map.json`, `exact_hash_report.json`,
+`tomato_filename_group_candidates.json`) and the approved policy files,
+then compares that independent reconstruction against every row of the
+existing `train.csv` / `val.csv` / `test.csv`. 70 checks were run; **all 70
+passed, zero blocking failures**.
+
+**Final manifest hashes and row counts** (unchanged from M3B-3A — these
+manifests were validated, not regenerated, for this sign-off):
+
+| Manifest | Rows | SHA-256 |
+|---|---:|---|
+| train.csv | 4,642 | `3bec912c0efb7a22eb66b388c364be6ab784ce3e8637ffe716c0804655b99a79` |
+| val.csv | 1,001 | `85f86dec9e81566b19d0654559f6b56c11d4b7086f3d5b8d244e00cae91dd91f` |
+| test.csv | 991 | `3d0ee43d9edc836eefadb71bf178d55d3e60817053efa5f9f5a52cd04c284abb` |
+| **Total** | **6,634** | |
+
+**Zero-overlap results** (`final_leakage_matrix.json`): 0 file-path
+overlaps, 0 SHA-256 overlaps, 0 original `group_key` overlaps, 0
+`similarity_guard_group` overlaps across the three splits — checked
+pairwise (train/val, train/test, val/test), explicit counts recorded even
+though all are zero. 0 approved `leaf_id` groups and 0 approved Tomato
+filename-family groups cross a split boundary.
+
+**Grouping-integrity results** (`final_group_integrity.json`): every one of
+the 6,634 rows' `group_key`, `group_source`, and `similarity_guard_group`
+matched the independently reconstructed expectation — 0 mismatches, 0
+unresolved paths, 0 cases of a guard overwriting an original `group_key`.
+
+**Similarity-guard results**: all 3 approved guards
+(`similarity-guard-phash-2623`, `-4306`, `-6432`) are each confined to
+exactly one split (train, train, and test respectively).
+**`phash-6432` is confirmed no longer split between train and
+validation** — both its images now land together in `test`.
+
+**Determinism result** (`final_determinism_check.json`): the validated
+manifests and backing reports were backed up, `build_splits.py` was run
+again in place, every regenerated file was compared byte-for-byte against
+the backup, and the backup was restored immediately after. **All
+deterministic outputs — `train.csv`, `val.csv`, `test.csv`,
+`split_summary.json`, `split_group_summary.json`,
+`split_input_integrity.json`, `split_manifest_hashes.json` — were
+byte-identical.** The validated manifests were never left in a modified
+state.
+
+**Known statistical limitations** (carried forward from M3B-3A, reconfirmed
+present in this document): Potato Healthy has only 38 authoritative
+physical-leaf groups in total; validation and test each contain only 6
+independent leaf groups; Potato Healthy precision, recall, and F1 carry
+high uncertainty as a result; macro-F1 must be interpreted cautiously
+whenever Potato Healthy is included. The 3 similarity guards are a
+split-safety constraint only and do not assert that guarded images share
+one physical leaf.
+
+**M4 (model training) has not started.** No training run, PyTorch
+installation, or EfficientNet-B0 setup has occurred as a result of this
+milestone. This sign-off makes the manifests the frozen input *candidate*
+for M4; starting M4 itself is a separate, explicit next step.
+
 ## Storage location
 
 `ml-service/data/raw/plantvillage-source/` — upstream directory structure
