@@ -253,6 +253,100 @@ deterministic: two consecutive runs produced byte-identical output for all
 of the above except the isolated volatile `tomato_recovery_run_metadata.json`
 timestamp file, matching the M3A reproducibility pattern.
 
+## Milestone M3B-2A: visual/structural review of proposed Tomato filename-family rules
+
+**Review status — read this before anything else in this section**: every
+visual judgment described below is `review_type: "preliminary_ai_review"`
+— an AI assistant's preliminary comparison of the rendered contact-sheet
+images, **not final human approval**. The proposed filename rules remain
+`status: "proposed_not_approved"`. **No filename group is eligible for
+train/validation/test use as a result of this section.** Final approval of
+these rules belongs to the user during Milestone M3B-2. The 6 large Tomato
+Late Blight groups (size ≥ 10) additionally require explicit, individual
+human review before any sign-off, regardless of their preliminary
+AI-assisted judgment.
+
+Since authoritative recovery (M3B-1) is exhausted, M3B-2A investigated
+whether the `GH_HL Leaf <N>` (Tomato Healthy) and `<session_prefix> Leaf
+<N> [Day <D>]` (Tomato Late Blight) filename conventions plausibly
+identify the same physical leaf across multiple photographs — a
+**candidate** rule only, not approved for split use.
+
+**Filename inventory** (`tomato_filename_group_inventory.json`):
+
+| Class | Unmatched | Malformed/unparseable | Parsed | Proposed groups | Singletons | Size 2 | Size 3 | Size ≥4 | Largest |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Tomato Healthy | 592 | 3 | 589 | 360 | 157 | 178 | 24 | 1 | 4 |
+| Tomato Late Blight | 989 | 0 | 989 | 712 | 585 | 76 | 30 | 21 | 17 |
+| Tomato Early Blight | 1 | — | — | 0 | — | — | — | — | — |
+
+The 3 Tomato Healthy malformed filenames are genuine upstream data-quality
+edge cases, not a parsing bug: a double-extension typo
+(`...380.1JPG.JPG`), a wholly different naming convention (`CG1.JPG`), and
+a Flickr-style numeric ID (`2700323949_95aa2eaa01_o.jpg`) — none belong to
+the `GH_HL` family and remain unresolved under this rule.
+
+**Collision checks**: zero group-key collisions across classes; zero raw
+filename-stem collisions between Tomato Healthy and Tomato Late Blight.
+109 Late Blight leaf numbers are shared across *different* session
+prefixes (e.g. both `GHLB2` and `GHLB_PS` have a "Leaf 23") — confirmed
+these remain **separate** groups under the proposed rule, since the
+grouping key includes the session prefix; grouping by leaf number alone
+would have incorrectly merged unrelated leaves from different
+experimental batches.
+
+**Comparison against authoritative data**: zero decimal-suffixed and zero
+`Day`-suffixed filenames exist anywhere in the three authoritative CSVs
+fetched in M3B-1. This comparison provides **no supporting or refuting
+evidence** either way — there is no comparable pattern in the authoritative
+source to validate against, so this hypothesis rests entirely on the
+visual review below, not on upstream precedent.
+
+**Visual review**: 20 Tomato Healthy groups (all multi-image groups
+qualify, sizes 2–4) and 30 Tomato Late Blight groups (stratified across
+all 4 session prefixes and both Day/non-Day patterns) were rendered as
+contact sheets (`ml-service/data/reports/tomato_filename_review/*.png`,
+gitignored) and visually inspected leaf-by-leaf. Result: **50/50 sampled
+groups showed consistent leaf silhouette, vein pattern, and (for Late
+Blight) lesion location/shape across every member** — 38 judged
+`same_physical_leaf_likely`, 12 (all Day-suffixed) judged
+`same_capture_series_likely` (consistent with disease-progression
+time-lapse photography, especially clear in the black-background `GHLB_PS`
+sequences). **Zero groups judged `clearly_different` or
+`unreadable_or_invalid`.** Filenames sharing a number were never treated
+as approved merely because they share a number — every judgment came from
+comparing the rendered images.
+
+**Large-chain caution**: 6 of the 30 Late Blight groups are large chains
+(size 10–17, built by collapsing both decimal-suffix and Day-number
+variation into one group). Visual review supports these being one leaf
+end-to-end, but per the M3B plan's anti-transitive-chaining principle,
+chains this long should not be blindly trusted without an additional
+safeguard (e.g. a maximum group size, or splitting into day-adjacent
+sub-chains) — flagged for explicit M3B-2 sign-off, not resolved here.
+
+**Proposed rules** (full regex/normalization/limitations in
+`tomato_filename_rule_proposal.json`): Tomato Healthy groups by base `Leaf
+<N>` (decimal sub-index stripped); Tomato Late Blight groups by
+`(session_prefix, Leaf <N>)` (decimal sub-index and `Day <N>` both
+stripped). Tomato Early Blight: no rule proposed (1 image cannot
+demonstrate a family); remains quarantined.
+
+**Status: proposed, not approved.** No `reviewed_filename_family`, no
+`approved_phash_groups.json`, and no split-eligibility change resulted
+from M3B-2A. A provisional (`status: "proposed_not_approved"`) reduced
+first-model scope was recorded at
+`ml-service/training/model_scope_v1.proposed.json` per explicit
+instruction — `training/class_map.json` was **not** modified and still
+defines all 8 original classes.
+
+**Reproducibility**: both the analysis script
+(`training/tomato_filename_group_review.py`) and the review-judgment
+script (`training/tomato_filename_review_judgments.py`) were run twice;
+every generated JSON report and every rendered contact-sheet PNG was
+byte-identical across both runs, except the isolated volatile
+`tomato_filename_review_run_metadata.json` timestamp field.
+
 ## Storage location
 
 `ml-service/data/raw/plantvillage-source/` — upstream directory structure
