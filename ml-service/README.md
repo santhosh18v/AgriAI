@@ -27,13 +27,20 @@ are implemented in later Phase 2 milestones.
   shape the real (gitignored) `models/version.json` will have once a model
   is trained. All values are placeholders.
 
+## Dataset
+
+Dataset source, licence, fetch method, and integrity metadata are documented
+in **[`docs/DATASET_PROVENANCE.md`](docs/DATASET_PROVENANCE.md)** — that
+file is the authoritative record; nothing dataset-related is duplicated
+here. The dataset itself lives only under the gitignored `ml-service/data/`
+directory and is never committed.
+
 ## What does NOT exist yet (later milestones)
 
-- No dataset has been downloaded (`ml-service/data/` does not exist — the
-  exact PlantVillage source URL and license require explicit approval at
-  M2 first).
-- No training/evaluation code (`training/prepare_dataset.py`, `train.py`,
-  `evaluate.py`, etc.) — M3/M4/M5.
+- No train/validation/test split manifests yet — `training/prepare_dataset.py`
+  currently implements discovery/reporting stages only (Milestone M3A);
+  deterministic split generation is Milestone M3B.
+- No training/evaluation code (`train.py`, `model.py`, `evaluate.py`) — M4/M5.
 - No FastAPI app (`app/main.py`, `app/routers/`, `app/inference.py`) and no
   running server — M6/M7.
 - No integration with the Next.js app — M8/M9.
