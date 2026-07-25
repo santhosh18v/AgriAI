@@ -1,0 +1,16 @@
+# Runtime / inference dependencies only.
+# Training/evaluation-only dependencies live in requirements-training.txt.
+#
+# Platform-specific PyTorch install notes (macOS MPS / Windows+CUDA RTX 3060 /
+# Google Colab) will be documented in README.md at a later milestone once
+# training actually begins. Do NOT `pip install -r requirements.txt` for M1 —
+# this file is a dependency manifest only; no environment is provisioned yet.
+
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic==2.7.4
+pillow==10.4.0
+python-multipart==0.0.9
+numpy==1.26.4
+torch==2.3.1
+torchvision==0.18.1
