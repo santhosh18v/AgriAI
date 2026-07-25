@@ -1,11 +1,39 @@
 # Training / evaluation dependencies. Superset of requirements.txt.
-# Not installed as part of M1 — dataset preparation and training pipelines
-# are implemented in later milestones (M3/M4).
+#
+# M4 compatibility note: this file used to do `-r requirements.txt` and add
+# extras on top. requirements.txt pins torch==2.3.1 / torchvision==0.18.1 /
+# numpy==1.26.4, none of which publish wheels for Python 3.13 (the actual
+# interpreter on this dev machine, arm64 macOS) -- `pip install` fails
+# outright on those three. Per the M4 instructions, requirements.txt itself
+# is NOT modified (it documents the intended runtime/FastAPI stack for a
+# not-yet-built inference service, a separate milestone). Instead, this file
+# now restates the full dependency set directly with the smallest version
+# bumps needed for Python 3.13/arm64 wheels to exist, verified via
+# `pip install --dry-run` against this project's ml-service/.venv on
+# 2026-07-25. Every other pin is unchanged from requirements.txt.
+#
+# torch==2.7.1 / torchvision==0.22.1 is an exact, verified pair (torchvision
+# 0.22.1's own metadata requires torch==2.7.1). scikit-learn 1.5.2 is the
+# first 1.5.x patch with a cp313 wheel. matplotlib 3.9.2 is the first 3.9.x
+# patch with a cp313 wheel. numpy 2.5.1 matches the version already
+# installed and exercised by imagehash/M3A in this project's venv.
 
--r requirements.txt
-scikit-learn==1.5.0
+# --- restated runtime deps (see note above; keep in sync with requirements.txt
+#     for any package that does NOT need a Python-3.13 compatibility bump) ---
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic==2.7.4
+pillow==10.4.0
+python-multipart==0.0.9
+numpy==2.5.1
+torch==2.7.1
+torchvision==0.22.1
+
+# --- training/evaluation-only extras ---
+scikit-learn==1.5.2
 pandas==2.2.2
-matplotlib==3.9.0
+matplotlib==3.9.2
 seaborn==0.13.2
 tqdm==4.66.4
 imagehash==4.3.1
+pytest==8.2.2

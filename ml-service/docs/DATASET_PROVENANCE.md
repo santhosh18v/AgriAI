@@ -685,10 +685,11 @@ whenever Potato Healthy is included. The 3 similarity guards are a
 split-safety constraint only and do not assert that guarded images share
 one physical leaf.
 
-**M4 (model training) has not started.** No training run, PyTorch
-installation, or EfficientNet-B0 setup has occurred as a result of this
-milestone. This sign-off makes the manifests the frozen input *candidate*
-for M4; starting M4 itself is a separate, explicit next step.
+**M4 (model training) status**: underway, using these manifests unchanged
+as its frozen train/validation input. Training configuration, commands,
+and results are documented separately in
+**[`MODEL_TRAINING.md`](MODEL_TRAINING.md)** — not duplicated here.
+`test.csv` remains untouched by M4; final test evaluation is M5.
 
 ## Storage location
 
