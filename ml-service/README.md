@@ -38,8 +38,10 @@ directory and is never committed.
 ## What does NOT exist yet (later milestones)
 
 - No train/validation/test split manifests yet — `training/prepare_dataset.py`
-  currently implements discovery/reporting stages only (Milestone M3A);
-  deterministic split generation is Milestone M3B.
+  currently implements discovery/reporting stages only (Milestone M3A).
+  Class scope and Tomato grouping decisions are now finalized (Milestone
+  M3B-2 — see `docs/DATASET_PROVENANCE.md`), but deterministic split
+  generation itself (Milestone M3B-3) has not started.
 - No training/evaluation code (`train.py`, `model.py`, `evaluate.py`) — M4/M5.
 - No FastAPI app (`app/main.py`, `app/routers/`, `app/inference.py`) and no
   running server — M6/M7.

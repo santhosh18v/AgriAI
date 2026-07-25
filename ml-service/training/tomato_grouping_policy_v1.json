@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "status": "approved",
+  "decision_source": "user_explicit_approval",
+  "approval_date_utc": "2026-07-25T13:46:49Z",
+  "source_milestone": "M3B-2",
+  "review_basis": "Preliminary evidence (M3B-1 authoritative-recovery investigation, M3B-2A AI-assisted preliminary visual review of 50 sampled groups, and pHash pairwise-distance analysis) was presented to the user; the approvals recorded in this file are the user's explicit, final decisions -- not a continuation of the preliminary_ai_review process itself.",
+
+  "singleton_fallback_forbidden": "Explicit policy: an unmatched/unresolved image is NEVER treated as a safe singleton group merely because no grouping evidence connects it to another image. Absence of evidence is not evidence of a unique leaf. Any image without an approved leaf_id, an approved filename-family group, or an approved pHash cluster remains quarantined -- it is never silently assigned its own one-image group to let it into a split.",
+  "unresolved_images_remain_quarantined": "Explicit policy: any image not covered by an approved grouping mechanism (authoritative leaf_id, an approved filename-family rule, or an approved pHash cluster) stays quarantined by default and is excluded from train/validation/test eligibility until a future, separate approval resolves it.",
+
+  "tomato_healthy": {
+    "rule_status": "approve_rule",
+    "regex": "^GH_HL Leaf (\\d+)(\\.(\\d+))?\\s*$",
+    "normalization": "Strip a leading <uuid>___ prefix if present, strip the final .jpg/.jpeg extension, match case-insensitively.",
+    "grouping_key": "th::Leaf<N> (decimal sub-index folded into the same group)",
+    "approved_group_count": 360,
+    "approved_image_count": 589,
+    "quarantined_filenames_excluded_from_rule": [
+      "GH_HL Leaf 380.1JPG.JPG (double-extension typo)",
+      "CG1.JPG (unrelated naming convention, not GH_HL family)",
+      "2700323949_95aa2eaa01_o.jpg (Flickr-style numeric ID, not GH_HL family)"
+    ],
+    "quarantined_count": 3
+  },
+
+  "tomato_late_blight": {
+    "rule_status": "approve_rule",
+    "regex": "^(GHLB2ES|GHLB2|GHLB_PS|GHLB)\\s+Leaf\\s+(\\d+)(\\.(\\d+))?(\\s+Day\\s*(\\d+))?\\s*$",
+    "normalization": "Strip a leading <uuid>___ prefix if present, strip the final .jpg/.jpeg extension, match case-insensitively; session prefix matched longest-first (GHLB2ES/GHLB2/GHLB_PS before GHLB).",
+    "grouping_key": "tlb::<session_prefix>::Leaf<N> (decimal sub-index AND Day number both folded into the same group; session prefix always kept separate -- confirmed 109 cases of a leaf number shared across different prefixes remain distinct groups)",
+    "approved_group_count": 712,
+    "approved_image_count": 989,
+    "quarantined_filenames_excluded_from_rule": [],
+    "quarantined_count": 0,
+    "large_groups": {
+      "size_threshold": 10,
+      "decision_basis": "Individually presented to the user with: full member filenames, Day/sub-index breakdown, preliminary_ai_review judgment, contact-sheet location, and newly-computed pairwise pHash Hamming distances (max 34-46 out of 64 -- no pixel-hash corroboration, grouping rests on filename metadata + preliminary AI visual review only).",
+      "approved_large_group_ids": [
+        "tlb::GHLB::Leaf1",
+        "tlb::GHLB::Leaf2",
+        "tlb::GHLB::Leaf23",
+        "tlb::GHLB_PS::Leaf1",
+        "tlb::GHLB_PS::Leaf2",
+        "tlb::GHLB_PS::Leaf8"
+      ],
+      "excluded_large_group_ids": [],
+      "large_group_detail": [
+        {"group_id": "tlb::GHLB::Leaf1", "size": 10, "status": "approve_group", "day_range": "1-13", "phash_max_distance": 38, "phash_min_distance": 14, "phash_avg_distance": 26.4},
+        {"group_id": "tlb::GHLB::Leaf2", "size": 17, "status": "approve_group", "day_range": "1-16", "phash_max_distance": 46, "phash_min_distance": 18, "phash_avg_distance": 30.5},
+        {"group_id": "tlb::GHLB::Leaf23", "size": 14, "status": "approve_group", "day_range": "9-18", "phash_max_distance": 44, "phash_min_distance": 12, "phash_avg_distance": 31.1},
+        {"group_id": "tlb::GHLB_PS::Leaf1", "size": 15, "status": "approve_group", "day_range": "7-18", "phash_max_distance": 42, "phash_min_distance": 16, "phash_avg_distance": 26.2},
+        {"group_id": "tlb::GHLB_PS::Leaf2", "size": 13, "status": "approve_group", "day_range": "7-18", "phash_max_distance": 40, "phash_min_distance": 14, "phash_avg_distance": 27.9},
+        {"group_id": "tlb::GHLB_PS::Leaf8", "size": 10, "status": "approve_group", "day_range": "7-16", "phash_max_distance": 34, "phash_min_distance": 14, "phash_avg_distance": 26.8}
+      ]
+    }
+  },
+
+  "tomato_early_blight": {
+    "rule_status": "no_rule_proposed",
+    "reason": "Only 1 unmatched image exists -- a single image cannot demonstrate a filename family.",
+    "quarantined_count": 1,
+    "quarantined_filename": "RS_Erly.B 6341.JPG"
+  },
+
+  "phash_clusters": {
+    "total_within_class_clusters_from_m3a": 14,
+    "covered_by_stronger_grouping_unconditional": {
+      "count": 3,
+      "cluster_ids": ["phash-2623", "phash-3069", "phash-4306"],
+      "reason": "Potato Early Blight x2 and Potato Late Blight x1 -- both members of each pair already have an authoritative leaf_id match; no separate pHash approval required."
+    },
+    "covered_by_stronger_grouping_conditional_on_approved_tomato_rules": {
+      "count": 8,
+      "cluster_ids": ["phash-7634", "phash-8251", "phash-7943", "phash-8453", "phash-8392", "phash-8976", "phash-8733", "phash-6432"],
+      "reason": "Tomato Healthy x7, Tomato Late Blight x1 -- both members of each pair already fall under the same approved th::/tlb:: filename-family group key (now approved above); no separate pHash approval required."
+    },
+    "remaining_standalone_decisions": {
+      "count": 3,
+      "cluster_ids": ["phash-1706", "phash-1884", "phash-2313"],
+      "class": "Corn Healthy",
+      "status": "needs_more_review",
+      "reason": "No leaf_id (Corn has none) and no filename rule proposed for Corn. Moot in practice while Corn is excluded from the active 6-class scope. Explicitly deferred, not approved and not rejected.",
+      "approved_phash_cluster_ids": []
+    }
+  },
+
+  "decision_history": [
+    {"question": "Approve the Tomato Healthy filename-family rule?", "answer": "approve_rule"},
+    {"question": "Approve the Tomato Late Blight filename-family rule?", "answer": "approve_rule"},
+    {"question": "How should the 6 large Tomato Late Blight groups be handled?", "answer": "Approve all 6"},
+    {"question": "The 3 Corn Healthy pHash clusters -- decision?", "answer": "needs_more_review"}
+  ]
+}

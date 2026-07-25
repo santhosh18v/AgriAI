@@ -347,6 +347,102 @@ every generated JSON report and every rendered contact-sheet PNG was
 byte-identical across both runs, except the isolated volatile
 `tomato_filename_review_run_metadata.json` timestamp field.
 
+## Milestone M3B-2: final user-approved decisions
+
+Everything in M3B-2A above was `preliminary_ai_review` only. The decisions
+below are the user's explicit, final approvals during M3B-2 — recorded
+authoritatively in `ml-service/training/model_scope_v1.json` and
+`ml-service/training/tomato_grouping_policy_v1.json` (both tracked in
+git). This section summarizes those two files; if this section and either
+tracked file ever disagree, the tracked file wins.
+
+**First-model class scope — approved.** The active model scope is reduced
+to **6 classes**: Tomato Healthy, Tomato Early Blight, Tomato Late Blight,
+Potato Healthy, Potato Early Blight, Potato Late Blight. **Corn Healthy**
+and **Corn Common Rust** are excluded — neither has authoritative
+physical-leaf grouping metadata in the approved PlantVillage source, and
+Corn Common Rust's filenames provide no usable grouping signal at all.
+This is a grouping/leakage-prevention limitation, not a judgment that the
+Corn images are invalid; Corn may return in a future model given
+defensible grouping metadata (e.g. manual leaf-counting, or an external
+validation set). `training/class_map.json` is **unchanged** and still
+defines all 8 originally approved classes — `model_scope_v1.json` is a
+training-time filter layered on top of it, not a redefinition of it.
+
+**Tomato Healthy filename rule — approved.** Groups by base `Leaf <N>`
+(regex `^GH_HL Leaf (\d+)(\.(\d+))?\s*$`, decimal sub-index folded into
+the same group). **360 groups / 589 images approved.** 3 malformed/
+unparseable filenames remain quarantined (a double-extension typo, an
+unrelated `CG1.JPG` naming convention, and a Flickr-style numeric ID) —
+none belong to the `GH_HL` family and singleton fallback is forbidden, so
+they are not auto-grouped.
+
+**Tomato Late Blight filename rule — approved.** Groups by
+`(session_prefix, Leaf <N>)` with decimal sub-index and `Day <N>` both
+folded into the same group, session prefix always kept separate (regex
+`^(GHLB2ES|GHLB2|GHLB_PS|GHLB)\s+Leaf\s+(\d+)(\.(\d+))?(\s+Day\s*(\d+))?\s*$`).
+**712 groups / 989 images approved. 0 quarantined** under this rule.
+
+**All 6 large Tomato Late Blight groups (size ≥ 10) — approved
+individually**, per the M3B plan's anti-chaining requirement:
+`tlb::GHLB::Leaf1` (10), `tlb::GHLB::Leaf2` (17, the largest chain in the
+dataset), `tlb::GHLB::Leaf23` (14), `tlb::GHLB_PS::Leaf1` (15),
+`tlb::GHLB_PS::Leaf2` (13), `tlb::GHLB_PS::Leaf8` (10) — 79 images total.
+Each was reviewed individually against its Day/sub-index breakdown,
+contact sheet, and pairwise pHash Hamming distances (max 34–46 of 64 —
+filename metadata plus preliminary AI visual review only, no pixel-hash
+corroboration). None were excluded. Full per-group detail:
+`ml-service/data/reports/m3b2_large_group_decisions.json` (gitignored).
+
+**pHash clusters (14 within-class clusters from M3A) — resolved.** 3
+clusters (2 Potato Early Blight, 1 Potato Late Blight) were already
+covered by an authoritative leaf_id match on both members. 8 clusters (7
+Tomato Healthy, 1 Tomato Late Blight) were already covered by the
+newly-approved filename-family rules above. The remaining **3 Corn
+Healthy clusters (phash-1706, phash-1884, phash-2313) are
+`needs_more_review`** — explicitly deferred, not approved and not
+rejected, and moot in practice while Corn is excluded from the active
+scope. Full per-cluster detail: `ml-service/data/reports/m3b2_phash_decisions.json`
+(gitignored).
+
+**Standing policy, reaffirmed:** singleton fallback is forbidden — an
+image with no approved leaf_id, filename-family group, or pHash cluster is
+never assigned its own one-image group. Any unresolved image remains
+quarantined until a future, separate approval resolves it.
+
+**Final eligible/quarantined counts** (active 6-class scope; full detail
+in `ml-service/data/reports/m3b2_quarantine_summary.json`, gitignored):
+
+| Class | Total | Eligible | Quarantined |
+|---|---:|---:|---:|
+| Potato Early Blight | 1,000 | 1,000 | 0 |
+| Potato Healthy | 152 | 152 | 0 |
+| Potato Late Blight | 1,000 | 1,000 | 0 |
+| Tomato Early Blight | 1,000 | 999 | 1 |
+| Tomato Healthy | 1,591 | 1,588 | 3 |
+| Tomato Late Blight | 1,909 | 1,909 | 0 |
+| **6-class subtotal** | **6,652** | **6,648** | **4** |
+| Corn Healthy (excluded by scope) | 1,162 | — | — |
+| Corn Common Rust (excluded by scope) | 1,192 | — | — |
+| **Raw dataset total** | **9,006** | | |
+
+Group counts are reported only for the portion newly resolved in M3B-2
+(the 360 + 712 approved filename-family groups above); recomputing a
+distinct-leaf-id group count for the already-authoritative-matched portion
+(999 Tomato Healthy, 920 Tomato Late Blight, 999 Tomato Early Blight, all
+Potato images — established in M3A/M3B-1's `leaf-map.json` join) is out of
+scope for M3B-2 and is not asserted here.
+
+As a consistency cross-check, all 14 exact pixel-duplicate pairs recorded
+in M3A's `exact_hash_report.json` (9 Tomato Healthy, 5 Tomato Late Blight)
+share the same base `Leaf <N>` number between representative and
+duplicate — every one already falls inside the same approved filename
+group above, confirming the grouping correctly captures these known
+duplicates. No count above changes as a result.
+
+**M3B-3 (split generation) has not started.** No `train.csv`, `val.csv`,
+or `test.csv` exists anywhere in the repository as of this milestone.
+
 ## Storage location
 
 `ml-service/data/raw/plantvillage-source/` — upstream directory structure
