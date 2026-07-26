@@ -6,6 +6,29 @@ import { fastAnalysisWithGroq } from "@/lib/groq";
 import connectDB from "@/lib/mongodb";
 import Analysis from "@/models/Analysis";
 import User from "@/models/User";
+import { parseAIResponse } from "@/lib/disease-analysis/providers/gemini";
+import { runDiseaseAnalysis } from "@/lib/disease-analysis/service";
+import { getDiseaseAnalysisConfig, DiseaseAnalysisConfigError } from "@/lib/disease-analysis/config";
+import { DiseaseAnalysisError, DiseaseAnalysisOutcome } from "@/lib/disease-analysis/types";
+
+type PersistedAiProvider = "gemini" | "groq" | "combined" | "custom-ml";
+
+/**
+ * Milestone M8: determines the honest `Analysis.aiProvider` value for a
+ * completed custom-ml-flow outcome (see Analysis.ts's schema comment).
+ * - Only Gemini ever produced usable content (full infrastructure
+ *   fallback -- predictWithCustomMl never returned data) -> "gemini".
+ * - Only the custom-ml model produced the returned result (accepted or
+ *   uncertain, no secondary opinion attached) -> "custom-ml".
+ * - Both custom-ml (primary, uncertain) AND Gemini (secondary opinion)
+ *   genuinely contributed -> "combined" -- never used for a single-source
+ *   result.
+ */
+function resolveDiseaseOutcomeAiProvider(outcome: DiseaseAnalysisOutcome): PersistedAiProvider {
+  if (outcome.secondaryOpinion) return "combined";
+  if (outcome.customMl) return "custom-ml";
+  return "gemini";
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,9 +49,51 @@ export async function POST(request: NextRequest) {
     }
 
     let rawResponse = "";
-    let aiProvider: "gemini" | "groq" | "combined" = "gemini";
+    let aiProvider: PersistedAiProvider = "gemini";
+    let diseaseOutcome: DiseaseAnalysisOutcome | null = null;
 
-    if (image && provider !== "groq") {
+    // Milestone M8: the custom ML disease-prediction service is only ever
+    // considered for the crop-disease image-analysis case, and only when
+    // explicitly selected via server-side configuration -- every other
+    // existing path (pest/soil/weather/waste image analysis, Groq, and
+    // text-only Gemini) is completely unchanged below.
+    let useCustomMlFlow = false;
+    if (image && provider !== "groq" && type === "crop_disease") {
+      try {
+        useCustomMlFlow = getDiseaseAnalysisConfig().provider === "custom-ml";
+      } catch (configError) {
+        if (configError instanceof DiseaseAnalysisConfigError) {
+          console.error("Disease analysis configuration error:", configError.message);
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "DISEASE_ANALYSIS_FAILED",
+                message: "Disease analysis is temporarily unavailable.",
+              },
+            },
+            { status: 500 }
+          );
+        }
+        throw configError;
+      }
+    }
+
+    if (useCustomMlFlow) {
+      try {
+        diseaseOutcome = await runDiseaseAnalysis({ file: image as File, query, cropName });
+        rawResponse = diseaseOutcome.legacy.rawResponse;
+      } catch (err) {
+        if (err instanceof DiseaseAnalysisError) {
+          console.error("Disease analysis provider error:", err.code, err.message);
+          return NextResponse.json(
+            { success: false, error: { code: err.code, message: err.message } },
+            { status: err.httpStatus }
+          );
+        }
+        throw err;
+      }
+    } else if (image && provider !== "groq") {
       // Image analysis with Gemini Vision
       const bytes = await image.arrayBuffer();
       const base64 = Buffer.from(bytes).toString("base64");
@@ -62,10 +127,30 @@ Please structure your response clearly with these sections.`;
       aiProvider = "gemini";
     }
 
-    // Parse the response into structured data
-    const parsed = parseAIResponse(rawResponse);
+    // Parse the response into structured data (already parsed for the
+    // custom-ml flow -- diseaseOutcome.legacy is used directly there).
+    const parsed = diseaseOutcome
+      ? {
+          diagnosis: diseaseOutcome.legacy.diagnosis,
+          severity: diseaseOutcome.legacy.severity,
+          confidence: diseaseOutcome.legacy.confidence,
+          treatment: diseaseOutcome.legacy.treatment,
+          prevention: diseaseOutcome.legacy.prevention,
+          expertAdvice: diseaseOutcome.legacy.expertAdvice,
+        }
+      : parseAIResponse(rawResponse);
 
-    // Save to MongoDB
+    // Milestone M8: every completed analysis is persisted, exactly as
+    // before M8 -- custom-ml results are no longer silently skipped (that
+    // would be a regression: every other request type has always been
+    // saved to history). `aiProvider` is resolved to an honest value that
+    // reflects what actually produced the result (see
+    // resolveDiseaseOutcomeAiProvider above); "combined" is only used when
+    // both custom-ml and Gemini genuinely contributed.
+    if (diseaseOutcome) {
+      aiProvider = resolveDiseaseOutcomeAiProvider(diseaseOutcome);
+    }
+
     await connectDB();
     const analysis = await Analysis.create({
       userId: (session.user as any).id,
@@ -79,20 +164,51 @@ Please structure your response clearly with these sections.`;
       },
       tags: extractTags(query, cropName, type),
     });
+    const analysisId: string = analysis._id;
 
-    // Increment user analysis count
+    // Increment user analysis count -- only reached after Analysis.create()
+    // succeeds; a persistence failure above throws and is handled by the
+    // outer try/catch, which never increments the count and never returns
+    // success:true (unchanged from pre-M8 behavior).
     await User.findByIdAndUpdate((session.user as any).id, {
       $inc: { analysisCount: 1 },
     });
 
+    const customMl = diseaseOutcome?.customMl;
+
     return NextResponse.json({
       success: true,
-      analysisId: analysis._id,
+      analysisId,
       result: {
         ...parsed,
         rawResponse,
+        ...(customMl
+          ? {
+              modelConfidence: customMl.modelConfidence,
+              accepted: customMl.accepted,
+              uncertain: customMl.uncertain,
+              confidenceLabel: customMl.confidenceLabel,
+              productionCalibrated: customMl.productionCalibrated,
+              supportedClass: customMl.supportedClass,
+              crop: customMl.crop,
+              condition: customMl.condition,
+              healthy: customMl.healthy,
+              topPredictions: customMl.topPredictions,
+            }
+          : {}),
       },
-      aiProvider,
+      aiProvider: diseaseOutcome ? diseaseOutcome.provider : aiProvider,
+      ...(customMl ? { source: { provider: "custom-ml", model: "efficientnet_b0", classCount: 6 } } : {}),
+      ...(customMl ? { limitations: customMl.limitations } : {}),
+      ...(diseaseOutcome?.fallback ? { fallback: diseaseOutcome.fallback } : {}),
+      ...(diseaseOutcome?.secondaryOpinion
+        ? {
+            secondaryOpinion: {
+              provider: diseaseOutcome.secondaryOpinion.provider,
+              result: diseaseOutcome.secondaryOpinion.legacy,
+            },
+          }
+        : {}),
     });
   } catch (error: any) {
     console.error("Analyze error:", error);
@@ -101,75 +217,6 @@ Please structure your response clearly with these sections.`;
       { status: 500 }
     );
   }
-}
-
-function parseAIResponse(response: string) {
-  // Find all matches with their index in the string
-  const regex = /(?:^|\n)[#\*\s\-\d\.]*(DIAGNOSIS|SEVERITY|CONFIDENCE|AFFECTED AREA|TREATMENT|PREVENTION|EXPERT ADVICE|EXPERT|CONSULT)[:\s\*\-]*/gi;
-  
-  const matches: { name: string; index: number; endIndex: number }[] = [];
-  let match;
-  while ((match = regex.exec(response)) !== null) {
-    matches.push({
-      name: match[1].toUpperCase(),
-      index: match.index,
-      endIndex: regex.lastIndex
-    });
-  }
-
-  // Helper to extract content between a match and the next match
-  function getContentForSection(sectionNames: string[]) {
-    const found = matches.find(m => sectionNames.includes(m.name));
-    if (!found) return null;
-    
-    // Find the next match that starts after this one
-    let nextMatch = null;
-    for (const m of matches) {
-      if (m.index > found.index) {
-        nextMatch = m;
-        break;
-      }
-    }
-    
-    const start = found.endIndex;
-    const end = nextMatch ? nextMatch.index : response.length;
-    return response.substring(start, end).trim();
-  }
-
-  const diagnosis = getContentForSection(["DIAGNOSIS"]);
-  const severityStr = getContentForSection(["SEVERITY"]);
-  const confidenceStr = getContentForSection(["CONFIDENCE"]);
-  const treatment = getContentForSection(["TREATMENT"]);
-  const prevention = getContentForSection(["PREVENTION"]);
-  const expertAdvice = getContentForSection(["EXPERT ADVICE", "EXPERT", "CONSULT"]);
-
-  // Extract severity value
-  let severity: "critical" | "high" | "medium" | "low" | "healthy" = "medium";
-  if (severityStr) {
-    const sevMatch = severityStr.match(/(critical|high|medium|low|healthy)/i);
-    if (sevMatch) severity = sevMatch[1].toLowerCase() as any;
-  }
-
-  // Extract confidence value
-  let confidence = 75;
-  if (confidenceStr) {
-    const confMatch = confidenceStr.match(/(\d+)/);
-    if (confMatch) confidence = parseInt(confMatch[1]);
-  }
-
-  return {
-    diagnosis: diagnosis || extractFirstMeaningfulParagraph(response),
-    severity,
-    confidence,
-    treatment: treatment || "Please consult the full analysis below.",
-    prevention: prevention || "Follow standard agricultural best practices.",
-    expertAdvice: expertAdvice || undefined,
-  };
-}
-
-function extractFirstMeaningfulParagraph(text: string): string {
-  const lines = text.split("\n").filter((l) => l.trim().length > 20);
-  return lines[0] || text.substring(0, 200);
 }
 
 function extractTags(query: string, cropName: string, type: string): string[] {

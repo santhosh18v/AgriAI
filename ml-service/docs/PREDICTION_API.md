@@ -228,4 +228,7 @@ steady-state timings after warm-up. **This is a single-machine, sequential,
 
 ## Status
 
-**M8 (Next.js integration) has not started.**
+**M8 connected this endpoint to the Next.js app** behind a server-side
+feature flag (default: disabled, Gemini remains primary). See the Next.js
+repo's `docs/CUSTOM_ML_INTEGRATION.md` for the consumer-side integration,
+provider-selection matrix, and fallback policy.

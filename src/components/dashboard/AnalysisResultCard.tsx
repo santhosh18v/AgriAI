@@ -31,6 +31,16 @@ const severityConfig: Record<string, { label: string; icon: any }> = {
   healthy: { label: "Healthy", icon: Sprout },
 };
 
+// Milestone M8: "custom-ml" and "combined" added alongside the existing
+// gemini/groq values (see src/models/Analysis.ts). Falls back to the
+// provider string itself for any future value rather than mislabeling it.
+const providerLabels: Record<string, string> = {
+  gemini: "Gemini Vision",
+  groq: "Groq Llama 3",
+  "custom-ml": "AgriAI Custom Model",
+  combined: "AgriAI Custom Model + Gemini",
+};
+
 export function AnalysisResultCard({
   result,
   aiProvider,
@@ -59,7 +69,7 @@ export function AnalysisResultCard({
               </span>
               <span className="tag flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
-                {aiProvider === "gemini" ? "Gemini Vision" : "Groq Llama 3"}
+                {providerLabels[aiProvider] || aiProvider}
               </span>
             </div>
             <h3 className="text-xl font-semibold leading-snug">{result.diagnosis}</h3>

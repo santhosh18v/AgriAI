@@ -6,7 +6,7 @@ export interface IAnalysis extends Document {
   type: "crop_disease" | "pest" | "soil" | "weather" | "waste" | "general";
   imageUrl?: string;
   query: string;
-  aiProvider: "gemini" | "groq" | "combined";
+  aiProvider: "gemini" | "groq" | "combined" | "custom-ml";
   result: {
     diagnosis: string;
     severity: "critical" | "high" | "medium" | "low" | "healthy";
@@ -40,7 +40,12 @@ const AnalysisSchema = new Schema<IAnalysis>(
     query: { type: String, required: true },
     aiProvider: {
       type: String,
-      enum: ["gemini", "groq", "combined"],
+      // "custom-ml" added in Milestone M8 (AgriAI's own EfficientNet-B0
+      // disease classifier). "combined" is used only when both custom-ml
+      // and Gemini genuinely contributed to one result (an uncertain
+      // custom-ml prediction with a Gemini secondary opinion attached) --
+      // never as a stand-in for a single-provider result.
+      enum: ["gemini", "groq", "combined", "custom-ml"],
       default: "gemini",
     },
     result: {

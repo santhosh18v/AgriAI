@@ -4,7 +4,7 @@ A full-stack Next.js 14 application built for the **AI Model Development Contest
 
 ## ✨ Features
 
-- **Crop Disease Detection** — Upload a photo, get instant diagnosis via Gemini Vision
+- **Crop Disease Detection** — Upload a photo, get instant diagnosis via Gemini Vision, or (behind a feature flag, see below) AgriAI's own custom EfficientNet-B0 model for six Tomato/Potato classes
 - **Pest Identification** — Identify pests and get organic/chemical control advice
 - **Soil Health Advisor** — Structured form-based soil assessment with AI recommendations
 - **AI Advisory Chat** — Real-time chat powered by Groq (fast) or Gemini (deep reasoning)
@@ -65,6 +65,30 @@ Open [http://localhost:3000](http://localhost:3000).
 ```bash
 npm run build
 npm start
+```
+
+### 5. Run tests
+
+```bash
+npm test
+```
+
+## 🧠 Custom ML disease-prediction service (optional, feature-flagged)
+
+AgriAI includes its own trained EfficientNet-B0 crop-disease classifier
+(`ml-service/`, a separate Python/FastAPI service — see
+`ml-service/README.md`) covering six Tomato/Potato classes. It is
+**disabled by default** and integrated behind a server-side feature flag —
+see **[`docs/CUSTOM_ML_INTEGRATION.md`](docs/CUSTOM_ML_INTEGRATION.md)**
+for the full architecture, environment variables, provider-selection
+matrix, and fallback policy. Gemini remains the default and fallback
+provider; this is purely additive.
+
+```bash
+# Terminal 1
+cd ml-service && .venv/bin/python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+# Terminal 2 (with CUSTOM_ML_ENABLED=true, DISEASE_ANALYSIS_PROVIDER=custom-ml in .env.local)
+npm run dev
 ```
 
 ## 📂 Project Structure

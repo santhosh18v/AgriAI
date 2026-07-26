@@ -15,6 +15,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/auth";
 
+// Milestone M8: "custom-ml" and "combined" added alongside the existing
+// gemini/groq values (see src/models/Analysis.ts). Falls back to the
+// provider string itself for any future value rather than mislabeling it.
+const providerLabels: Record<string, string> = {
+  gemini: "Gemini",
+  groq: "Groq",
+  "custom-ml": "AgriAI Custom Model",
+  combined: "AgriAI Custom Model + Gemini",
+};
+
 const typeIcons: Record<string, any> = {
   crop_disease: ScanLine,
   pest: Bug,
@@ -138,7 +148,7 @@ export function HistoryList() {
                       {a.confidence}% confidence · {new Date(a.createdAt).toLocaleString()} ·{" "}
                       <span className="inline-flex items-center gap-1">
                         <Sparkles className="w-3 h-3" />
-                        {a.aiProvider === "gemini" ? "Gemini" : "Groq"}
+                        {providerLabels[a.aiProvider] || a.aiProvider}
                       </span>
                     </p>
                   </div>
