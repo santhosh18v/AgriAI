@@ -1,14 +1,15 @@
 # AgriAI ml-service
 
 Python service for the Phase 2 custom crop-disease classifier. Through
-**Milestone M6**, this covers dataset preparation, an approved deterministic
+**Milestone M7**, this covers dataset preparation, an approved deterministic
 train/validation/test split, a first reproducible EfficientNet-B0 training
 baseline, a one-time frozen test evaluation with a validation-selected
-confidence threshold, and a running FastAPI service foundation (health,
-readiness, model-info). There is still no image upload or disease-prediction
-endpoint, and no Next.js integration — those are later milestones.
+confidence threshold, a running FastAPI service foundation (health,
+readiness, model-info), and a real disease-image prediction endpoint. There
+is still no upload persistence, no prediction history, no Gemini fallback,
+and no Next.js integration — those are later milestones.
 
-## What exists through M6
+## What exists through M7
 
 - `requirements.txt` — pinned runtime/inference dependencies (FastAPI,
   Pillow, PyTorch, etc), for the not-yet-built inference service.
@@ -19,13 +20,15 @@ endpoint, and no Next.js integration — those are later milestones.
   its pins differ from `requirements.txt`.
 - `.env.example` — names and safe placeholder values for the `AGRI_ML_`-
   prefixed settings (see `docs/API_FOUNDATION.md`). No real secrets.
-- `app/` — the M6 FastAPI service foundation: `main.py` (app + lifespan +
-  CORS), `config.py` (pydantic-settings), `model_loader.py` (validated,
-  load-once model loading), `schemas.py`, `dependencies.py`, and
-  `routes/health.py` / `routes/model_info.py`. See
-  `docs/API_FOUNDATION.md` for endpoints, configuration, and the
-  model-loading lifecycle. There is no image upload or `/predict/disease`
-  endpoint yet — that is M7.
+- `app/` — the FastAPI service: `main.py` (app + lifespan + CORS),
+  `config.py` (pydantic-settings), `model_loader.py` (validated, load-once
+  model loading), `schemas.py`, `dependencies.py`, `routes/health.py`,
+  `routes/model_info.py`, and (M7) `routes/predict.py`,
+  `image_validation.py`, `preprocessing.py`, `inference.py`. See
+  `docs/API_FOUNDATION.md` (foundation/config) and
+  `docs/PREDICTION_API.md` (the `/api/predict/disease` endpoint). There is
+  still no upload persistence, prediction history, or Gemini fallback —
+  that is later scope.
 - `training/class_map.json` — the 8 approved classes (Tomato/Potato/Corn),
   frozen index-to-label mapping, unchanged since M1.
 - `training/model_scope_v1.json`, `training/tomato_grouping_policy_v1.json`,
@@ -48,9 +51,10 @@ endpoint, and no Next.js integration — those are later milestones.
   decision record. See `docs/MODEL_EVALUATION.md` for full results.
 - `tests/training/` — pytest suite for the M4/M5 pipeline, using tiny
   synthetic images/manifests only (no real dataset images are tracked).
-- `tests/api/` — pytest suite for the M6 API foundation, using tiny
-  synthetic checkpoints only (the real ~48MB checkpoint is never loaded by
-  an automated test).
+- `tests/api/` — pytest suite for the API foundation and prediction
+  endpoint (M6/M7), using tiny synthetic checkpoints and in-memory synthetic
+  images only (the real ~48MB checkpoint and PlantVillage source images are
+  never used by an automated test).
 
 ## Dataset
 
@@ -77,11 +81,15 @@ reproduction commands are documented in
 **[`docs/MODEL_EVALUATION.md`](docs/MODEL_EVALUATION.md)**. `test.csv` has
 now been evaluated exactly once and must not be evaluated again.
 
-## API foundation (M6)
+## API foundation (M6) and prediction endpoint (M7)
 
 The FastAPI service foundation — health, readiness, and model-information
 endpoints, configuration, and safe model loading — is documented in
-**[`docs/API_FOUNDATION.md`](docs/API_FOUNDATION.md)**.
+**[`docs/API_FOUNDATION.md`](docs/API_FOUNDATION.md)**. The disease-image
+prediction endpoint (`POST /api/predict/disease`) — upload validation,
+preprocessing, inference, response shape, and manual-verification results
+against the real checkpoint — is documented in
+**[`docs/PREDICTION_API.md`](docs/PREDICTION_API.md)**.
 
 ```bash
 cd ml-service
@@ -90,7 +98,7 @@ cd ml-service
 
 ## What does NOT exist yet (later milestones)
 
-- No image upload endpoint and no `/predict/disease` endpoint — M7.
+- No upload persistence, prediction history, or Gemini fallback.
 - No integration with the Next.js app — M8/M9.
 
 ## Approved classes (fixed, do not add without approval)

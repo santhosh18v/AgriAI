@@ -1,27 +1,35 @@
-# API Foundation — Milestone M6
+# API Foundation — Milestone M6 (+ M7 endpoint registration)
 
 ## Purpose
 
-M6 builds the FastAPI service *foundation* that M7's prediction endpoint
-will later run on top of: application startup, configuration, safe model
-loading/validation, and three read-only endpoints (health, readiness,
-model-info). **There is no image upload endpoint and no `/predict/disease`
-endpoint yet.** M7 has not started.
+M6 built the FastAPI service *foundation*: application startup,
+configuration, safe model loading/validation, and three read-only
+endpoints (health, readiness, model-info). M7 added the first real
+inference endpoint, `POST /api/predict/disease`, on top of that
+foundation — its request/response contract, validation, preprocessing,
+and inference details are documented separately in
+**[`PREDICTION_API.md`](PREDICTION_API.md)**; this document covers the
+shared foundation (config, lifecycle, CORS, error handling) both endpoints
+rely on.
 
 ## Service architecture
 
 ```
 ml-service/app/
 ├── __init__.py
-├── main.py            # FastAPI app factory, lifespan, CORS, error handling
-├── config.py           # pydantic-settings, AGRI_ML_-prefixed env vars
-├── dependencies.py      # request -> app.state accessors
-├── model_loader.py      # validated, load-once model loading
-├── schemas.py           # typed response models
+├── main.py               # FastAPI app factory, lifespan, CORS, error handling
+├── config.py              # pydantic-settings, AGRI_ML_-prefixed env vars
+├── dependencies.py         # request -> app.state accessors
+├── model_loader.py         # validated, load-once model loading
+├── schemas.py              # typed response models
+├── image_validation.py     # M7: in-memory upload validation
+├── preprocessing.py        # M7: exact M4 validation transform
+├── inference.py            # M7: torch.inference_mode() forward pass
 └── routes/
     ├── __init__.py
-    ├── health.py         # GET /api/health, GET /api/ready
-    └── model_info.py     # GET /api/model-info
+    ├── health.py          # GET /api/health, GET /api/ready
+    ├── model_info.py      # GET /api/model-info
+    └── predict.py         # M7: POST /api/predict/disease
 ```
 
 No database, message queue, background worker, or cloud dependency was
@@ -77,14 +85,22 @@ construction, not silently or deep inside model loading.
 | `eager_model_load` | `AGRI_ML_EAGER_MODEL_LOAD` | `true` |
 | `cors_origins` | `AGRI_ML_CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` |
 | `request_id_header` | `AGRI_ML_REQUEST_ID_HEADER` | `X-Request-ID` (reserved; not yet wired into logging/responses) |
+| `max_upload_bytes` | `AGRI_ML_MAX_UPLOAD_BYTES` | `10485760` (10 MB) |
+| `allowed_image_mime_types` | `AGRI_ML_ALLOWED_IMAGE_MIME_TYPES` | `image/jpeg,image/png,image/webp` |
+| `allowed_image_extensions` | `AGRI_ML_ALLOWED_IMAGE_EXTENSIONS` | `.jpg,.jpeg,.png,.webp` |
+| `image_decode_max_pixels` | `AGRI_ML_IMAGE_DECODE_MAX_PIXELS` | `24000000` (24 MP; decompression-bomb guard) |
+| `include_top_predictions` | `AGRI_ML_INCLUDE_TOP_PREDICTIONS` | `true` |
+| `top_k_predictions` | `AGRI_ML_TOP_K_PREDICTIONS` | `3` (validated: `1`–`6`, the approved active class count) |
 
 The four path settings default to `None` and are resolved lazily against
 `ML_SERVICE_ROOT` (via `Settings.resolved_*_path()`) only when actually
 needed — they are never required to exist just to construct `Settings`;
-existence/content validation happens in `model_loader.py`.
+existence/content validation happens in `model_loader.py`. The M7 upload
+settings (`allowed_image_mime_types`, `allowed_image_extensions`) reject
+empty lists and wildcard entries (e.g. `image/*`) at construction time.
 
-No secrets are read or required by this service in M6. `ml-service/.env`
-is gitignored and must never be committed; see `.env.example`.
+No secrets are read or required by this service. `ml-service/.env` is
+gitignored and must never be committed; see `.env.example`.
 
 ## Startup command
 
@@ -168,8 +184,8 @@ which is deliberately validation-only, and not re-derived by re-evaluating
 `test.csv` (which must not happen again). If the model is unavailable,
 this endpoint returns `HTTP 503` with `{"status": "unavailable", "reason": "..."}`.
 
-There is no `/predict/disease` endpoint and no image upload endpoint. That
-is M7 scope and has not been started.
+`POST /api/predict/disease` (the image upload / prediction endpoint) is
+documented in **[`PREDICTION_API.md`](PREDICTION_API.md)**, not here.
 
 ## Model-loading lifecycle
 
@@ -209,7 +225,8 @@ for portability but not exercised on this machine.
 Configured only from validated settings — never `allow_origins=["*"]`
 combined with credentials, and no hard-coded, unapproved deployment
 domains. `allow_credentials=False` (no cookie/auth mechanism exists yet)
-and `allow_methods=["GET"]` (every M6 endpoint is read-only).
+and `allow_methods=["GET", "POST"]` (`POST` was added in M7 for
+`/api/predict/disease`; every other route remains `GET`-only).
 
 Default allowed origins: `http://localhost:3000`, `http://127.0.0.1:3000`
 (local Next.js dev server). Override via a comma-separated or JSON-array
@@ -240,4 +257,5 @@ no production-readiness claim is made anywhere in this service.
 
 ## Status
 
-**`/predict/disease` is not implemented.** **M7 has not started.**
+`POST /api/predict/disease` is implemented (M7) — see
+`docs/PREDICTION_API.md`. **M8 (Next.js integration) has not started.**

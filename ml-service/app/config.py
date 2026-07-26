@@ -21,6 +21,16 @@ ML_SERVICE_ROOT = Path(__file__).resolve().parent.parent
 ALLOWED_ENVIRONMENTS = {"development", "test", "production"}
 ALLOWED_DEVICES = {"auto", "cpu", "mps", "cuda"}
 
+# The approved active-class count (see training/model_scope_v1.json /
+# app/model_loader.py's REQUIRED_ACTIVE_CLASS_COUNT). Duplicated as a
+# small, stable literal here (rather than importing model_loader.py, which
+# would pull training/'s sys.path manipulation into config.py for one
+# integer) -- keep both in sync if the approved scope ever changes.
+MAX_SUPPORTED_CLASS_COUNT = 6
+
+DEFAULT_ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"]
+DEFAULT_ALLOWED_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
+
 # Frozen M5 results. Not read from confidence_policy_v1.json because that
 # file is deliberately validation-only (see docs/MODEL_EVALUATION.md /
 # M5's design) and never contains test-derived values. These two numbers
@@ -76,6 +86,23 @@ class Settings(BaseSettings):
     preferred_device: str = "auto"
     eager_model_load: bool = True
 
+    # --- Upload / prediction (Milestone M7) -------------------------------
+    max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+    # NoDecode: same reasoning as cors_origins below -- accept a plain
+    # comma-separated .env value without requiring JSON array quoting.
+    allowed_image_mime_types: Annotated[List[str], NoDecode] = Field(
+        default_factory=lambda: list(DEFAULT_ALLOWED_IMAGE_MIME_TYPES)
+    )
+    allowed_image_extensions: Annotated[List[str], NoDecode] = Field(
+        default_factory=lambda: list(DEFAULT_ALLOWED_IMAGE_EXTENSIONS)
+    )
+    # Bounds decoded pixel count (width * height) against decompression-bomb
+    # risk while comfortably covering normal phone-camera photos (a typical
+    # default iPhone/Android photo is ~12MP; this allows up to ~24MP).
+    image_decode_max_pixels: int = Field(default=24_000_000, gt=0)
+    include_top_predictions: bool = True
+    top_k_predictions: int = Field(default=3, ge=1, le=MAX_SUPPORTED_CLASS_COUNT)
+
     # --- HTTP ------------------------------------------------------------
     # NoDecode: skip pydantic-settings' default JSON decoding of list-typed
     # env vars so a plain comma-separated string (see the validator below)
@@ -103,9 +130,9 @@ class Settings(BaseSettings):
             raise ValueError(f"preferred_device must be one of {sorted(ALLOWED_DEVICES)}, got {v!r}")
         return v
 
-    @field_validator("cors_origins", mode="before")
+    @field_validator("cors_origins", "allowed_image_mime_types", "allowed_image_extensions", mode="before")
     @classmethod
-    def _parse_cors_origins(cls, v):
+    def _parse_comma_or_json_list(cls, v):
         """Accepts either a JSON array (pydantic-settings default for list
         fields) or a simple comma-separated string, so a plain .env line
         like `AGRI_ML_CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000`
@@ -116,7 +143,27 @@ class Settings(BaseSettings):
                 import json
 
                 return json.loads(stripped)
-            return [origin.strip() for origin in stripped.split(",") if origin.strip()]
+            return [item.strip() for item in stripped.split(",") if item.strip()]
+        return v
+
+    @field_validator("allowed_image_mime_types")
+    @classmethod
+    def _validate_allowed_mime_types(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError("allowed_image_mime_types must not be empty")
+        for mime_type in v:
+            if "*" in mime_type:
+                raise ValueError(f"wildcard MIME types are not allowed, got {mime_type!r}")
+        return v
+
+    @field_validator("allowed_image_extensions")
+    @classmethod
+    def _validate_allowed_extensions(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError("allowed_image_extensions must not be empty")
+        for ext in v:
+            if "*" in ext or not ext.startswith("."):
+                raise ValueError(f"extensions must be literal, dot-prefixed values, got {ext!r}")
         return v
 
     def resolved_model_checkpoint_path(self) -> Path:

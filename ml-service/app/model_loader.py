@@ -32,6 +32,8 @@ if str(TRAINING_DIR) not in sys.path:
 from dataset import load_active_classes, load_class_index_by_name  # noqa: E402
 from model import ARCHITECTURE_NAME, build_model, select_device  # noqa: E402
 
+from .preprocessing import preprocessing_config as supported_preprocessing_config
+
 logger = logging.getLogger("agri_ml.model_loader")
 
 REQUIRED_ACTIVE_CLASS_COUNT = 6
@@ -51,6 +53,23 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _validate_preprocessing_config(recorded: Optional[dict]) -> None:
+    """Fails safely (M7) if the checkpoint's own recorded preprocessing
+    config does not match what app/preprocessing.py actually implements at
+    inference time -- prevents ever silently running inference through a
+    mismatched pipeline. Mirrors the same check training/evaluate.py already
+    performs at M5 evaluation time."""
+    if not recorded:
+        raise ModelLoadError("checkpoint has no recorded preprocessing configuration")
+    expected = supported_preprocessing_config()
+    if (
+        recorded.get("image_size") != expected["image_size"]
+        or recorded.get("normalization", {}).get("mean") != expected["normalization"]["mean"]
+        or recorded.get("normalization", {}).get("std") != expected["normalization"]["std"]
+    ):
+        raise ModelLoadError("checkpoint preprocessing configuration is not supported by this inference pipeline")
 
 
 @dataclass(frozen=True)
@@ -131,6 +150,8 @@ def _validate_and_build(settings) -> Tuple[torch.nn.Module, ModelMetadata]:
 
     if ckpt.get("architecture") != ARCHITECTURE_NAME:
         raise ModelLoadError("checkpoint architecture does not match the expected architecture")
+
+    _validate_preprocessing_config(ckpt.get("preprocessing_config"))
 
     class_names = ckpt.get("class_names")
     class_to_index = ckpt.get("class_to_index")

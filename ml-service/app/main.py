@@ -1,8 +1,9 @@
-"""AgriAI ML Service -- FastAPI application (Milestone M6: foundation only).
+"""AgriAI ML Service -- FastAPI application.
 
-Implements process health, readiness, and model-information endpoints.
-There is no image upload endpoint and no /predict/disease endpoint here --
-that is M7 scope and has deliberately not been started.
+Implements process health, readiness, model-information, and (as of
+Milestone M7) the disease-prediction endpoint. There is still no upload
+persistence, no prediction history, no Gemini fallback, and no Next.js
+integration -- those are later milestones.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from fastapi.responses import JSONResponse
 
 from .config import get_settings
 from .model_loader import ModelLoader
-from .routes import health, model_info
+from .routes import health, model_info, predict
 
 logging.basicConfig(
     level=logging.INFO,
@@ -81,19 +82,21 @@ def create_app(settings=None) -> FastAPI:
         lifespan=_build_lifespan(settings),
     )
 
-    # No credentials (cookies/auth headers) are used by this service in M6,
-    # so allow_credentials stays False even though allow_origins is a
-    # specific, configured allowlist rather than "*".
+    # No credentials (cookies/auth headers) are used by this service, so
+    # allow_credentials stays False even though allow_origins is a
+    # specific, configured allowlist rather than "*". POST was added in M7
+    # for the prediction endpoint; every other route remains GET-only.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
 
     app.include_router(health.router, prefix="/api", tags=["health"])
     app.include_router(model_info.router, prefix="/api", tags=["model-info"])
+    app.include_router(predict.router, prefix="/api", tags=["predict"])
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
