@@ -208,3 +208,10 @@ error message..."` test.
 - No migration of existing documents. No change to `confidence_policy_v1.json`,
   the model checkpoint, the training pipeline, or the dataset/split
   manifests.
+
+## Status
+
+This schema was validated end to end against a real MongoDB instance
+during **M10** (see [`CUSTOM_ML_E2E_VALIDATION.md`](CUSTOM_ML_E2E_VALIDATION.md)).
+See [`PHASE_2_CUSTOM_DISEASE_ML.md`](PHASE_2_CUSTOM_DISEASE_ML.md) for how
+this fits into the complete, now-complete Phase 2 feature (M1–M11).

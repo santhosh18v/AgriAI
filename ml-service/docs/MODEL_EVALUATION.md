@@ -235,8 +235,9 @@ paths, for internal review only — never copied into tracked files):
   milestone substitutes for evaluating the model against real-world,
   out-of-distribution farm photography before any deployment decision.
 - **This model and confidence policy are not production-calibrated.** No
-  production-readiness claim is made anywhere in this milestone. M6
-  (the FastAPI inference service) has not started.
+  production-readiness claim is made anywhere in this milestone, or
+  anywhere in this project (see the "Status" section below for what was
+  later built on top of this frozen checkpoint/threshold).
 
 ## Potato Healthy limitation (test set)
 
@@ -322,4 +323,7 @@ applying this same frozen checkpoint and threshold to live image uploads.
 No production-readiness claim is made for this baseline. The frozen
 threshold (0.50) currently performs no rejection at all on the observed
 test set and should not be assumed to generalize to future, harder or
-out-of-distribution images without further review.
+out-of-distribution images without further review. **M8–M10** (Next.js
+integration, MongoDB persistence, and a real end-to-end validation pass)
+are also complete — see `../docs/PHASE_2_CUSTOM_DISEASE_ML.md` for the
+full Phase 2 picture.

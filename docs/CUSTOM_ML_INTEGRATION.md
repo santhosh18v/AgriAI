@@ -300,5 +300,8 @@ schema and `AnalysisResultCard.tsx`/`HistoryList.tsx` for how it's
 rendered. **M10** (real end-to-end validation against a running MongoDB,
 FastAPI service, and Next.js app) has been completed — see
 [`CUSTOM_ML_E2E_VALIDATION.md`](CUSTOM_ML_E2E_VALIDATION.md) for the full
-results, including disclosed limitations. M11 (final documentation /
-sign-off) has not started.
+results, including disclosed limitations. **M11** (final documentation and
+release-readiness sign-off) is complete — see
+[`PHASE_2_CUSTOM_DISEASE_ML.md`](PHASE_2_CUSTOM_DISEASE_ML.md) for the
+authoritative Phase 2 overview and [`PHASE_2_SIGN_OFF.md`](PHASE_2_SIGN_OFF.md)
+for the formal sign-off record.

@@ -7,9 +7,11 @@ foundation: `POST /api/predict/disease`. It accepts one uploaded leaf image,
 validates and preprocesses it exactly as M4's validation/inference
 pipeline, runs the already-loaded, frozen EfficientNet-B0 checkpoint, and
 returns a structured prediction using the frozen, validation-selected
-confidence threshold (0.50). **There is no upload persistence, no
-prediction history, no Gemini fallback, no treatment recommendations, and
-no Next.js integration in M7** — M8 has not started.
+confidence threshold (0.50). **This endpoint itself has no upload
+persistence, no prediction history, no Gemini fallback, and no treatment
+recommendations, by design** — it is a stateless prediction API. Next.js
+integration, MongoDB persistence, and Gemini fallback are implemented on
+the consumer side (M8/M9) — see the "Status" section below.
 
 ## Endpoint
 
@@ -229,6 +231,10 @@ steady-state timings after warm-up. **This is a single-machine, sequential,
 ## Status
 
 **M8 connected this endpoint to the Next.js app** behind a server-side
-feature flag (default: disabled, Gemini remains primary). See the Next.js
-repo's `docs/CUSTOM_ML_INTEGRATION.md` for the consumer-side integration,
-provider-selection matrix, and fallback policy.
+feature flag (default: disabled, Gemini remains primary). **M9** added
+MongoDB persistence and result/history UI support for the data this
+endpoint returns, and **M10** validated the complete flow end to end
+against the real running services. See the Next.js repo's
+`docs/CUSTOM_ML_INTEGRATION.md` for the consumer-side integration,
+provider-selection matrix, and fallback policy, and
+`docs/PHASE_2_CUSTOM_DISEASE_ML.md` for the full Phase 2 picture.

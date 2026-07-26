@@ -316,4 +316,7 @@ part of M10 — this validation was purely observational.
 ## Status
 
 M10 real end-to-end validation is complete, with the disclosed limitations
-above. **M11 (final documentation / sign-off) has not started.**
+above. **M11** (final documentation and release-readiness sign-off) is
+complete — see [`PHASE_2_SIGN_OFF.md`](PHASE_2_SIGN_OFF.md) for the formal
+sign-off record and [`PHASE_2_CUSTOM_DISEASE_ML.md`](PHASE_2_CUSTOM_DISEASE_ML.md)
+for the authoritative Phase 2 overview.

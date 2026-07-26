@@ -258,4 +258,7 @@ no production-readiness claim is made anywhere in this service.
 ## Status
 
 `POST /api/predict/disease` is implemented (M7) — see
-`docs/PREDICTION_API.md`. **M8 (Next.js integration) has not started.**
+`docs/PREDICTION_API.md`. Next.js integration (M8), MongoDB persistence
+and result/history UI (M9), and a real end-to-end validation pass (M10)
+are all complete — see `../docs/CUSTOM_ML_INTEGRATION.md` and
+`../docs/PHASE_2_CUSTOM_DISEASE_ML.md` for the full Phase 2 picture.

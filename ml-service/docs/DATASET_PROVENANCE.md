@@ -702,3 +702,6 @@ limitations, and reproduction commands are in
 `ml-service/data/raw/plantvillage-source/` — upstream directory structure
 preserved exactly, not flattened. Entirely covered by the existing
 `ml-service/data/` `.gitignore` rule; nothing under it is committed.
+
+See **[`../../docs/PHASE_2_CUSTOM_DISEASE_ML.md`](../../docs/PHASE_2_CUSTOM_DISEASE_ML.md)**
+for how this dataset work fits into the complete Phase 2 feature (M1–M11).

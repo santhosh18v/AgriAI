@@ -1,18 +1,25 @@
 # AgriAI ml-service
 
-Python service for the Phase 2 custom crop-disease classifier. Through
-**Milestone M7**, this covers dataset preparation, an approved deterministic
-train/validation/test split, a first reproducible EfficientNet-B0 training
-baseline, a one-time frozen test evaluation with a validation-selected
-confidence threshold, a running FastAPI service foundation (health,
-readiness, model-info), and a real disease-image prediction endpoint. There
-is still no upload persistence, no prediction history, no Gemini fallback,
-and no Next.js integration — those are later milestones.
+Python service for the Phase 2 custom crop-disease classifier. Phase 2's
+ten implementation milestones (M1–M10) are all complete: dataset
+preparation, an approved deterministic train/validation/test split, a
+reproducible EfficientNet-B0 training baseline, a one-time frozen test
+evaluation with a validation-selected confidence threshold, a FastAPI
+service (health/readiness/model-info/prediction), full Next.js
+integration with MongoDB persistence and history, and a real, authenticated
+end-to-end validation pass. M11 (final documentation/sign-off) is
+complete — see the repo root's
+**[`docs/PHASE_2_CUSTOM_DISEASE_ML.md`](../docs/PHASE_2_CUSTOM_DISEASE_ML.md)**
+for the authoritative Phase 2 overview,
+**[`docs/PHASE_2_SIGN_OFF.md`](../docs/PHASE_2_SIGN_OFF.md)** for the
+formal sign-off record, and
+**[`docs/CUSTOM_ML_LIMITATIONS.md`](../docs/CUSTOM_ML_LIMITATIONS.md)** for
+the complete, honest list of what this feature does not prove.
 
-## What exists through M7
+## What exists
 
 - `requirements.txt` — pinned runtime/inference dependencies (FastAPI,
-  Pillow, PyTorch, etc), for the not-yet-built inference service.
+  Pillow, PyTorch, etc), for the deployed inference service.
 - `requirements-training.txt` — the actual environment used for M3/M4:
   training/evaluation tooling (torch, torchvision, scikit-learn, tqdm,
   pytest, imagehash, etc), with Python-3.13/arm64-compatible version pins.
@@ -26,9 +33,11 @@ and no Next.js integration — those are later milestones.
   `routes/model_info.py`, and (M7) `routes/predict.py`,
   `image_validation.py`, `preprocessing.py`, `inference.py`. See
   `docs/API_FOUNDATION.md` (foundation/config) and
-  `docs/PREDICTION_API.md` (the `/api/predict/disease` endpoint). There is
-  still no upload persistence, prediction history, or Gemini fallback —
-  that is later scope.
+  `docs/PREDICTION_API.md` (the `/api/predict/disease` endpoint). Upload
+  persistence, prediction history, and Gemini fallback are implemented on
+  the Next.js side (M8/M9) — see `../docs/CUSTOM_ML_INTEGRATION.md` and
+  `../docs/CUSTOM_ML_RESULT_SCHEMA.md`; this service itself never persists
+  an uploaded image or a prediction.
 - `training/class_map.json` — the 8 approved classes (Tomato/Potato/Corn),
   frozen index-to-label mapping, unchanged since M1.
 - `training/model_scope_v1.json`, `training/tomato_grouping_policy_v1.json`,
@@ -93,13 +102,21 @@ against the real checkpoint — is documented in
 
 ```bash
 cd ml-service
-.venv/bin/python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+source .venv/bin/activate
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ```
 
-## What does NOT exist yet (later milestones)
+See the repo root's **[`docs/CUSTOM_ML_RUNBOOK.md`](../docs/CUSTOM_ML_RUNBOOK.md)**
+for the complete local-startup runbook covering this service, MongoDB, and
+Next.js together, including troubleshooting.
 
-- No upload persistence, prediction history, or Gemini fallback.
-- No integration with the Next.js app — M8/M9.
+## Out of scope for this service
+
+Upload persistence, prediction history, Gemini fallback, and the crop-
+scanner UI are implemented on the Next.js side, not in this service — see
+`../docs/CUSTOM_ML_INTEGRATION.md`. This service is a stateless prediction
+API only: it never persists an uploaded image, a prediction, or any user
+data.
 
 ## Approved classes (fixed, do not add without approval)
 

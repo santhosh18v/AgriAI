@@ -212,3 +212,7 @@ implementation in torch 2.7.1. Seeded initialization, data ordering, and
 augmentation are reproducible; exact floating-point reduction order in
 MPS matmul/conv may still vary run to run. CPU runs are expected to be
 closer to fully deterministic.
+
+See **[`../../docs/PHASE_2_CUSTOM_DISEASE_ML.md`](../../docs/PHASE_2_CUSTOM_DISEASE_ML.md)**
+for how this training baseline fits into the complete, now-complete
+Phase 2 feature (M1–M11).
