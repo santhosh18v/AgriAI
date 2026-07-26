@@ -297,4 +297,8 @@ and, as of **M9**, dedicated `customMl`/`providerMetadata`/
 `secondaryOpinion`/`resultVersion` fields — see
 [`CUSTOM_ML_RESULT_SCHEMA.md`](CUSTOM_ML_RESULT_SCHEMA.md) for the current
 schema and `AnalysisResultCard.tsx`/`HistoryList.tsx` for how it's
-rendered. M10 (end-to-end sign-off) has not started.
+rendered. **M10** (real end-to-end validation against a running MongoDB,
+FastAPI service, and Next.js app) has been completed — see
+[`CUSTOM_ML_E2E_VALIDATION.md`](CUSTOM_ML_E2E_VALIDATION.md) for the full
+results, including disclosed limitations. M11 (final documentation /
+sign-off) has not started.
