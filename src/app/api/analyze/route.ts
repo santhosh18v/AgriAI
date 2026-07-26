@@ -9,26 +9,14 @@ import User from "@/models/User";
 import { parseAIResponse } from "@/lib/disease-analysis/providers/gemini";
 import { runDiseaseAnalysis } from "@/lib/disease-analysis/service";
 import { getDiseaseAnalysisConfig, DiseaseAnalysisConfigError } from "@/lib/disease-analysis/config";
+import {
+  buildDiseaseAnalysisPersistenceInput,
+  DiseaseAnalysisPersistenceInput,
+  PersistenceValidationError,
+} from "@/lib/disease-analysis/persistence";
 import { DiseaseAnalysisError, DiseaseAnalysisOutcome } from "@/lib/disease-analysis/types";
 
 type PersistedAiProvider = "gemini" | "groq" | "combined" | "custom-ml";
-
-/**
- * Milestone M8: determines the honest `Analysis.aiProvider` value for a
- * completed custom-ml-flow outcome (see Analysis.ts's schema comment).
- * - Only Gemini ever produced usable content (full infrastructure
- *   fallback -- predictWithCustomMl never returned data) -> "gemini".
- * - Only the custom-ml model produced the returned result (accepted or
- *   uncertain, no secondary opinion attached) -> "custom-ml".
- * - Both custom-ml (primary, uncertain) AND Gemini (secondary opinion)
- *   genuinely contributed -> "combined" -- never used for a single-source
- *   result.
- */
-function resolveDiseaseOutcomeAiProvider(outcome: DiseaseAnalysisOutcome): PersistedAiProvider {
-  if (outcome.secondaryOpinion) return "combined";
-  if (outcome.customMl) return "custom-ml";
-  return "gemini";
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -140,15 +128,37 @@ Please structure your response clearly with these sections.`;
         }
       : parseAIResponse(rawResponse);
 
-    // Milestone M8: every completed analysis is persisted, exactly as
-    // before M8 -- custom-ml results are no longer silently skipped (that
-    // would be a regression: every other request type has always been
-    // saved to history). `aiProvider` is resolved to an honest value that
-    // reflects what actually produced the result (see
-    // resolveDiseaseOutcomeAiProvider above); "combined" is only used when
-    // both custom-ml and Gemini genuinely contributed.
+    // Milestone M9: build + independently re-validate the persistence input
+    // for a disease-analysis outcome BEFORE ever calling Analysis.create.
+    // This does NOT trust diseaseOutcome/customMl as already-safe just
+    // because providers/custom-ml.ts validated it once -- every invariant
+    // is re-checked from scratch at this boundary (see persistence.ts). A
+    // validation failure here must not persist a partial or inconsistent
+    // document and must not increment analysisCount.
+    let persistenceInput: DiseaseAnalysisPersistenceInput | null = null;
     if (diseaseOutcome) {
-      aiProvider = resolveDiseaseOutcomeAiProvider(diseaseOutcome);
+      try {
+        persistenceInput = buildDiseaseAnalysisPersistenceInput(diseaseOutcome);
+      } catch (err) {
+        if (err instanceof PersistenceValidationError) {
+          console.error("Disease analysis persistence validation failed:", err.message);
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "DISEASE_ANALYSIS_FAILED",
+                message: "Disease analysis is temporarily unavailable.",
+              },
+            },
+            { status: 500 }
+          );
+        }
+        throw err;
+      }
+      // `aiProvider` (the honest persisted enum value) always comes from
+      // providerMetadata now -- the single source of truth shared with the
+      // immediate response below, so the two can never diverge.
+      aiProvider = persistenceInput.providerMetadata.persistedProvider;
     }
 
     await connectDB();
@@ -162,6 +172,10 @@ Please structure your response clearly with these sections.`;
         ...parsed,
         rawResponse,
       },
+      ...(persistenceInput?.customMl ? { customMl: persistenceInput.customMl } : {}),
+      ...(persistenceInput ? { providerMetadata: persistenceInput.providerMetadata } : {}),
+      ...(persistenceInput?.secondaryOpinion ? { secondaryOpinion: persistenceInput.secondaryOpinion } : {}),
+      ...(persistenceInput ? { resultVersion: persistenceInput.resultVersion } : {}),
       tags: extractTags(query, cropName, type),
     });
     const analysisId: string = analysis._id;
@@ -174,48 +188,32 @@ Please structure your response clearly with these sections.`;
       $inc: { analysisCount: 1 },
     });
 
-    const customMl = diseaseOutcome?.customMl;
-
+    // Milestone M9: the immediate response reuses the exact same
+    // persistenceInput fields (customMl/providerMetadata/secondaryOpinion/
+    // resultVersion) that were just written to MongoDB -- not a
+    // separately-shaped summary -- so the immediate response and the
+    // history response can never describe the same request differently.
     return NextResponse.json({
       success: true,
       analysisId,
       result: {
         ...parsed,
         rawResponse,
-        ...(customMl
-          ? {
-              modelConfidence: customMl.modelConfidence,
-              accepted: customMl.accepted,
-              uncertain: customMl.uncertain,
-              confidenceLabel: customMl.confidenceLabel,
-              productionCalibrated: customMl.productionCalibrated,
-              supportedClass: customMl.supportedClass,
-              crop: customMl.crop,
-              condition: customMl.condition,
-              healthy: customMl.healthy,
-              topPredictions: customMl.topPredictions,
-            }
-          : {}),
       },
       aiProvider: diseaseOutcome ? diseaseOutcome.provider : aiProvider,
-      ...(customMl ? { source: { provider: "custom-ml", model: "efficientnet_b0", classCount: 6 } } : {}),
-      ...(customMl ? { limitations: customMl.limitations } : {}),
-      ...(diseaseOutcome?.fallback ? { fallback: diseaseOutcome.fallback } : {}),
-      ...(diseaseOutcome?.secondaryOpinion
-        ? {
-            secondaryOpinion: {
-              provider: diseaseOutcome.secondaryOpinion.provider,
-              result: diseaseOutcome.secondaryOpinion.legacy,
-            },
-          }
-        : {}),
+      ...(persistenceInput?.customMl ? { customMl: persistenceInput.customMl } : {}),
+      ...(persistenceInput ? { providerMetadata: persistenceInput.providerMetadata } : {}),
+      ...(persistenceInput?.secondaryOpinion ? { secondaryOpinion: persistenceInput.secondaryOpinion } : {}),
+      ...(persistenceInput ? { resultVersion: persistenceInput.resultVersion } : {}),
     });
   } catch (error: any) {
+    // Milestone M9 (Section 15 security fix): never interpolate
+    // error.message (or any other internal detail -- stack traces,
+    // upstream URLs, Mongo error text) into the client-facing response.
+    // Full detail is logged server-side only; the client always gets the
+    // same generic, safe message and a stable 500 status.
     console.error("Analyze error:", error);
-    return NextResponse.json(
-      { error: `Analysis failed: ${error?.message || error}` },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Analysis failed. Please try again later." }, { status: 500 });
   }
 }
 

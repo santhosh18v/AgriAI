@@ -31,6 +31,7 @@ function makeFile(): File {
 function makeCustomMlResult(overrides: Partial<CustomMlNormalizedResult> = {}): CustomMlNormalizedResult {
   return {
     disease: "Tomato Late Blight",
+    classIndex: 2,
     crop: "Tomato",
     condition: "Late Blight",
     healthy: false,
@@ -40,7 +41,10 @@ function makeCustomMlResult(overrides: Partial<CustomMlNormalizedResult> = {}): 
     confidenceLabel: "model confidence",
     productionCalibrated: false,
     supportedClass: true,
-    topPredictions: [{ className: "Tomato Late Blight", modelConfidence: 0.98 }],
+    confidenceThreshold: 0.5,
+    confidenceMethod: "maximum_softmax_probability",
+    topPredictions: [{ className: "Tomato Late Blight", classIndex: 2, modelConfidence: 0.98 }],
+    model: { architecture: "efficientnet_b0", classCount: 6 },
     limitations: ["Model confidence is not certainty or probability of truth."],
     ...overrides,
   };
@@ -200,6 +204,17 @@ describe("fallback policy", () => {
     const outcome = await runDiseaseAnalysis({ file: makeFile(), query: "q" });
     expect(outcome.provider).toBe("gemini");
     expect(outcome.fallback?.fallbackReason).toBe("timeout");
+  });
+
+  it("falls back with fallbackReason 'service_not_ready' when the ml-service reports not ready (Milestone M9)", async () => {
+    process.env.CUSTOM_ML_FALLBACK_TO_GEMINI = "true";
+    predictWithCustomMlMock.mockRejectedValueOnce(
+      new DiseaseAnalysisError("ML_SERVICE_NOT_READY", "not ready", 503)
+    );
+
+    const outcome = await runDiseaseAnalysis({ file: makeFile(), query: "q" });
+    expect(outcome.provider).toBe("gemini");
+    expect(outcome.fallback?.fallbackReason).toBe("service_not_ready");
   });
 });
 

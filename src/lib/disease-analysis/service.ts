@@ -46,7 +46,7 @@ function mapErrorCodeToFallbackReason(code: string): FallbackReason {
     case "ML_SERVICE_TIMEOUT":
       return "timeout";
     case "ML_SERVICE_NOT_READY":
-      return "not_ready";
+      return "service_not_ready";
     case "ML_UPSTREAM_INVALID_RESPONSE":
       return "malformed_upstream";
     default:

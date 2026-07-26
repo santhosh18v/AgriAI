@@ -81,8 +81,11 @@ AgriAI includes its own trained EfficientNet-B0 crop-disease classifier
 **disabled by default** and integrated behind a server-side feature flag —
 see **[`docs/CUSTOM_ML_INTEGRATION.md`](docs/CUSTOM_ML_INTEGRATION.md)**
 for the full architecture, environment variables, provider-selection
-matrix, and fallback policy. Gemini remains the default and fallback
-provider; this is purely additive.
+matrix, and fallback policy, and
+**[`docs/CUSTOM_ML_RESULT_SCHEMA.md`](docs/CUSTOM_ML_RESULT_SCHEMA.md)**
+for the persisted MongoDB / API response schema (model prediction
+metadata, provider provenance, secondary opinions). Gemini remains the
+default and fallback provider; this is purely additive.
 
 ```bash
 # Terminal 1

@@ -71,6 +71,7 @@ function makeCustomMlOutcome(overrides: Partial<DiseaseAnalysisOutcome> = {}): D
     },
     customMl: {
       disease: "Tomato Late Blight",
+      classIndex: 2,
       crop: "Tomato",
       condition: "Late Blight",
       healthy: false,
@@ -80,7 +81,10 @@ function makeCustomMlOutcome(overrides: Partial<DiseaseAnalysisOutcome> = {}): D
       confidenceLabel: "model confidence",
       productionCalibrated: false,
       supportedClass: true,
-      topPredictions: [{ className: "Tomato Late Blight", modelConfidence: 0.98 }],
+      confidenceThreshold: 0.5,
+      confidenceMethod: "maximum_softmax_probability",
+      topPredictions: [{ className: "Tomato Late Blight", classIndex: 2, modelConfidence: 0.98 }],
+      model: { architecture: "efficientnet_b0", classCount: 6 },
       limitations: ["Model confidence is not certainty or probability of truth."],
     },
     ...overrides,
@@ -129,19 +133,23 @@ describe("custom-ml success path", () => {
     expect(body.success).toBe(true);
     expect(body.aiProvider).toBe("custom-ml");
     expect(body.result.diagnosis).toBe("Tomato Late Blight");
-    expect(body.result.modelConfidence).toBe(0.98);
-    expect(body.result.crop).toBe("Tomato");
-    expect(body.result.condition).toBe("Late Blight");
-    expect(body.result.healthy).toBe(false);
-    expect(body.result.accepted).toBe(true);
-    expect(body.result.uncertain).toBe(false);
-    expect(body.source).toEqual({ provider: "custom-ml", model: "efficientnet_b0", classCount: 6 });
+    expect(body.customMl.modelConfidence).toBe(0.98);
+    expect(body.customMl.crop).toBe("Tomato");
+    expect(body.customMl.condition).toBe("Late Blight");
+    expect(body.customMl.healthy).toBe(false);
+    expect(body.customMl.accepted).toBe(true);
+    expect(body.customMl.uncertain).toBe(false);
+    expect(body.customMl.model).toEqual({ architecture: "efficientnet_b0", classCount: 6 });
+    expect(body.providerMetadata.persistedProvider).toBe("custom-ml");
+    expect(body.resultVersion).toBe(2);
     expect(body.analysisId).toBe("analysis-abc");
 
     // Now persisted (Section 2/Option B correction): every completed
     // analysis is saved, exactly like every other provider.
     expect(analysisCreateMock).toHaveBeenCalledTimes(1);
     expect(analysisCreateMock.mock.calls[0][0].aiProvider).toBe("custom-ml");
+    expect(analysisCreateMock.mock.calls[0][0].customMl.modelConfidence).toBe(0.98);
+    expect(analysisCreateMock.mock.calls[0][0].resultVersion).toBe(2);
     expect(userUpdateMock).toHaveBeenCalledTimes(1);
   });
 
@@ -167,8 +175,8 @@ describe("custom-ml success path", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.result.accepted).toBe(false);
-    expect(body.result.uncertain).toBe(true);
+    expect(body.customMl.accepted).toBe(false);
+    expect(body.customMl.uncertain).toBe(true);
     expect(body.result.expertAdvice).toMatch(/low-confidence/i);
 
     // Section 2: an uncertain result with NO secondary opinion must not be
@@ -204,12 +212,16 @@ describe("custom-ml success path", () => {
     // Live response: primary provider/result stays custom-ml, uncertain,
     // with the secondary opinion clearly separate -- never silently merged.
     expect(body.aiProvider).toBe("custom-ml");
-    expect(body.result.uncertain).toBe(true);
+    expect(body.customMl.uncertain).toBe(true);
     expect(body.secondaryOpinion.provider).toBe("gemini");
-    expect(body.secondaryOpinion.result.diagnosis).toBe("Possible late blight");
+    expect(body.secondaryOpinion.diagnosis).toBe("Possible late blight");
+    expect(body.providerMetadata.persistedProvider).toBe("combined");
+    expect(body.providerMetadata.secondaryOpinionUsed).toBe(true);
 
     // Persisted record: "combined" because both genuinely contributed.
     expect(analysisCreateMock.mock.calls[0][0].aiProvider).toBe("combined");
+    expect(analysisCreateMock.mock.calls[0][0].secondaryOpinion.diagnosis).toBe("Possible late blight");
+    expect(analysisCreateMock.mock.calls[0][0].providerMetadata.persistedProvider).toBe("combined");
     // Exactly one history record -- fallback must not create two.
     expect(analysisCreateMock).toHaveBeenCalledTimes(1);
     expect(userUpdateMock).toHaveBeenCalledTimes(1);
@@ -236,13 +248,19 @@ describe("custom-ml success path", () => {
 
     expect(res.status).toBe(200);
     expect(body.aiProvider).toBe("gemini");
-    expect(body.fallback).toEqual({
-      primaryProvider: "custom-ml",
+    expect(body.customMl).toBeUndefined();
+    expect(body.providerMetadata).toEqual({
+      primaryProvider: "gemini",
+      persistedProvider: "gemini",
+      fallbackUsed: true,
       fallbackProvider: "gemini",
       fallbackReason: "service_unavailable",
+      secondaryOpinionUsed: false,
     });
     expect(analysisCreateMock).toHaveBeenCalledTimes(1);
     expect(analysisCreateMock.mock.calls[0][0].aiProvider).toBe("gemini");
+    expect(analysisCreateMock.mock.calls[0][0].customMl).toBeUndefined();
+    expect(analysisCreateMock.mock.calls[0][0].providerMetadata.fallbackUsed).toBe(true);
     expect(userUpdateMock).toHaveBeenCalledTimes(1);
   });
 });
@@ -291,17 +309,32 @@ describe("database failure handling", () => {
     expect(userUpdateMock).not.toHaveBeenCalled();
   });
 
-  it("a database failure response never leaks a stack trace or internal detail", async () => {
+  it("a database failure response never leaks a stack trace or internal detail (Milestone M9, Section 15 fix)", async () => {
     fastAnalysisWithGroqMock.mockResolvedValueOnce("DIAGNOSIS: x\nSEVERITY: low\nCONFIDENCE: 50");
     analysisCreateMock.mockRejectedValueOnce(new Error("connect ECONNREFUSED mongodb://internal-host:27017"));
 
     const res = await POST(makeRequest({ query: "spots", type: "crop_disease", provider: "groq" }));
-    // NOTE: the pre-existing (pre-M8) catch-all handler interpolates
-    // error.message directly (`Analysis failed: ${error.message}`) -- this
-    // is unchanged legacy behavior, not introduced by M8, and is flagged
-    // in the report rather than silently patched here (out of M8's
-    // "fix blocking issues only" scope).
+    const body = await res.json();
+
     expect(res.status).toBe(500);
+    expect(body.error).not.toContain("ECONNREFUSED");
+    expect(body.error).not.toContain("internal-host");
+    expect(body.error).not.toContain("mongodb://");
+    expect(body.error).toBe("Analysis failed. Please try again later.");
+  });
+
+  it("the outer catch handler never interpolates a raw error message for any thrown Error, regardless of content", async () => {
+    fastAnalysisWithGroqMock.mockImplementationOnce(() => {
+      throw new Error("Sensitive: API key sk-abcdef123456 rejected by upstream at http://internal:9999");
+    });
+
+    const res = await POST(makeRequest({ query: "spots", type: "crop_disease", provider: "groq" }));
+    const text = await res.text();
+
+    expect(res.status).toBe(500);
+    expect(text).not.toContain("sk-abcdef123456");
+    expect(text).not.toContain("internal:9999");
+    expect(text).not.toContain("Sensitive");
   });
 });
 
@@ -367,11 +400,12 @@ describe("stored result / rawResponse safety (Section 3)", () => {
     expect(persisted.result.confidence).toBeLessThanOrEqual(100);
   });
 
-  it("does NOT persist additive custom-ml-only fields (modelConfidence/topPredictions/etc) -- response-only until M9", async () => {
+  it("keeps additive custom-ml fields out of the legacy `result` object -- they persist in the sibling `customMl` field (Milestone M9)", async () => {
     runDiseaseAnalysisMock.mockResolvedValueOnce(makeCustomMlOutcome());
     await POST(makeRequest({ query: "spots", type: "crop_disease", image: makeImageFile() }));
 
-    const persistedResult = analysisCreateMock.mock.calls[0][0].result;
+    const persisted = analysisCreateMock.mock.calls[0][0];
+    const persistedResult = persisted.result;
     expect(persistedResult).not.toHaveProperty("modelConfidence");
     expect(persistedResult).not.toHaveProperty("accepted");
     expect(persistedResult).not.toHaveProperty("uncertain");
@@ -379,6 +413,53 @@ describe("stored result / rawResponse safety (Section 3)", () => {
     expect(persistedResult).not.toHaveProperty("crop");
     expect(persistedResult).not.toHaveProperty("condition");
     expect(persistedResult).not.toHaveProperty("healthy");
+
+    expect(persisted.customMl.modelConfidence).toBe(0.98);
+    expect(persisted.customMl.accepted).toBe(true);
+    expect(persisted.customMl.uncertain).toBe(false);
+    expect(persisted.customMl.topPredictions).toEqual([
+      { className: "Tomato Late Blight", classIndex: 2, modelConfidence: 0.98 },
+    ]);
+    expect(persisted.customMl.crop).toBe("Tomato");
+    expect(persisted.customMl.condition).toBe("Late Blight");
+    expect(persisted.customMl.healthy).toBe(false);
+  });
+});
+
+describe("persistence-boundary validation (Milestone M9, Section 8)", () => {
+  it("does not persist and does not increment analysisCount when the custom-ml outcome fails independent re-validation", async () => {
+    runDiseaseAnalysisMock.mockResolvedValueOnce(
+      makeCustomMlOutcome({
+        customMl: { ...makeCustomMlOutcome().customMl!, modelConfidence: 5 }, // out of [0,1] range
+      })
+    );
+
+    const res = await POST(
+      makeRequest({ query: "spots on leaves", type: "crop_disease", image: makeImageFile() })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe("DISEASE_ANALYSIS_FAILED");
+    expect(analysisCreateMock).not.toHaveBeenCalled();
+    expect(userUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("a persistence-validation failure response never leaks the internal validation reason", async () => {
+    runDiseaseAnalysisMock.mockResolvedValueOnce(
+      makeCustomMlOutcome({
+        customMl: { ...makeCustomMlOutcome().customMl!, classIndex: 99 },
+      })
+    );
+
+    const res = await POST(
+      makeRequest({ query: "spots on leaves", type: "crop_disease", image: makeImageFile() })
+    );
+    const text = await res.text();
+
+    expect(text).not.toContain("classIndex");
+    expect(text).not.toContain("approved class ordering");
   });
 });
 

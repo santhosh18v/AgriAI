@@ -157,6 +157,38 @@ describe("valid response parsing", () => {
     expect(result.supportedClass).toBe(true);
     expect(result.topPredictions).toHaveLength(2);
   });
+
+  it("carries classIndex/confidenceThreshold/confidenceMethod/model through into the normalized result (Milestone M9)", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(VALID_PREDICT_BODY));
+    const result = await predictWithCustomMl(makeConfig(), makeFile());
+
+    expect(result.classIndex).toBe(2);
+    expect(result.confidenceThreshold).toBe(0.5);
+    expect(result.confidenceMethod).toBe("maximum_softmax_probability");
+    expect(result.model).toEqual({ architecture: "efficientnet_b0", classCount: 6 });
+  });
+
+  it("sorts top_predictions descending and caps at 3 entries, even if upstream returns more or out of order", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ...VALID_PREDICT_BODY,
+        top_predictions: [
+          { class_name: "Potato Healthy", class_index: 3, model_confidence: 0.01 },
+          { class_name: "Tomato Late Blight", class_index: 2, model_confidence: 0.9842 },
+          { class_name: "Tomato Early Blight", class_index: 1, model_confidence: 0.0107 },
+          { class_name: "Potato Early Blight", class_index: 4, model_confidence: 0.005 },
+          { class_name: "Potato Late Blight", class_index: 5, model_confidence: 0.0001 },
+        ],
+      })
+    );
+    const result = await predictWithCustomMl(makeConfig(), makeFile());
+
+    expect(result.topPredictions).toHaveLength(3);
+    expect(result.topPredictions[0].className).toBe("Tomato Late Blight");
+    expect(result.topPredictions[0].modelConfidence).toBe(0.9842);
+    expect(result.topPredictions[1].className).toBe("Tomato Early Blight");
+    expect(result.topPredictions[2].className).toBe("Potato Healthy");
+  });
 });
 
 describe("strict upstream validation", () => {
@@ -226,6 +258,20 @@ describe("strict upstream validation", () => {
 
   it("rejects a non-success status", async () => {
     await expectInvalidResponse({ ...VALID_PREDICT_BODY, status: "error" });
+  });
+
+  it("rejects a class_index that disagrees with the approved class ordering (Milestone M9)", async () => {
+    await expectInvalidResponse({
+      ...VALID_PREDICT_BODY,
+      prediction: { ...VALID_PREDICT_BODY.prediction, class_index: 0 }, // "Tomato Late Blight" is index 2, not 0
+    });
+  });
+
+  it("rejects an unsupported confidence_policy.method (Milestone M9)", async () => {
+    await expectInvalidResponse({
+      ...VALID_PREDICT_BODY,
+      confidence_policy: { ...VALID_PREDICT_BODY.confidence_policy, method: "temperature_scaling" },
+    });
   });
 
   it("rejects malformed JSON", async () => {

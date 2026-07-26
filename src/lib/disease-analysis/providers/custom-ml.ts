@@ -15,11 +15,31 @@
 
 import { classBreakdown } from "../class-mapping";
 import { DiseaseAnalysisConfig } from "../config";
-import { CustomMlNormalizedResult, DiseaseAnalysisError, TopPrediction, isApprovedClassName } from "../types";
+import {
+  APPROVED_CLASS_NAMES,
+  ApprovedClassName,
+  ConfidenceMethod,
+  CUSTOM_ML_MODEL_INFO,
+  CustomMlNormalizedResult,
+  DiseaseAnalysisError,
+  TopPrediction,
+  isApprovedClassName,
+} from "../types";
 
 const EXPECTED_THRESHOLD = 0.5;
+const SUPPORTED_CONFIDENCE_METHODS: readonly ConfidenceMethod[] = ["maximum_softmax_probability"];
+const MAX_TOP_PREDICTIONS = 3;
 const READY_CACHE_TTL_MS = 5000;
 const READY_CHECK_MAX_TIMEOUT_MS = 5000;
+
+/** The approved class's expected index, per the same fixed ordering
+ * ml-service's class_map.json and training/model.py use (verified to
+ * match at M7/M8 time). Used as a cross-check against the upstream
+ * response's own `class_index` -- a mismatch means the two sides disagree
+ * about class ordering and the response must not be trusted. */
+function expectedClassIndex(className: ApprovedClassName): number {
+  return APPROVED_CLASS_NAMES.indexOf(className);
+}
 
 interface ReadyCacheEntry {
   ready: boolean;
@@ -99,8 +119,10 @@ function fail(): never {
 
 /** Strictly validates an upstream JSON body and normalizes it. Never
  * trusts an unknown class name, an out-of-range confidence, a threshold
- * other than 0.50, a confidence label other than "model confidence", or
- * production_calibrated !== false -- any of these fail the whole response. */
+ * other than 0.50, a confidence label other than "model confidence",
+ * production_calibrated !== false, an unsupported confidence method, or a
+ * class_index that disagrees with the approved class ordering -- any of
+ * these fail the whole response. */
 function validateAndNormalize(body: unknown): CustomMlNormalizedResult {
   if (typeof body !== "object" || body === null) fail();
   const b = body as any;
@@ -112,6 +134,11 @@ function validateAndNormalize(body: unknown): CustomMlNormalizedResult {
 
   const className = prediction.class_name;
   if (!isApprovedClassName(className)) fail(); // never silently accept Corn or any other unknown class
+
+  const classIndex = prediction.class_index;
+  if (typeof classIndex !== "number" || !Number.isInteger(classIndex) || classIndex !== expectedClassIndex(className)) {
+    fail(); // upstream class_index must agree with the approved class ordering
+  }
 
   const modelConfidence = prediction.model_confidence;
   if (
@@ -134,6 +161,8 @@ function validateAndNormalize(body: unknown): CustomMlNormalizedResult {
   if (policy.threshold !== EXPECTED_THRESHOLD) fail();
   if (policy.label !== "model confidence") fail();
   if (policy.production_calibrated !== false) fail();
+  const confidenceMethod = policy.method;
+  if (!SUPPORTED_CONFIDENCE_METHODS.includes(confidenceMethod)) fail();
 
   const rawTopPredictions = Array.isArray(b.top_predictions) ? b.top_predictions : [];
   const topPredictions: TopPrediction[] = [];
@@ -141,19 +170,30 @@ function validateAndNormalize(body: unknown): CustomMlNormalizedResult {
     if (
       item &&
       isApprovedClassName(item.class_name) &&
+      typeof item.class_index === "number" &&
+      item.class_index === expectedClassIndex(item.class_name) &&
       typeof item.model_confidence === "number" &&
       item.model_confidence >= 0 &&
       item.model_confidence <= 1
     ) {
-      topPredictions.push({ className: item.class_name, modelConfidence: item.model_confidence });
+      topPredictions.push({
+        className: item.class_name,
+        classIndex: item.class_index,
+        modelConfidence: item.model_confidence,
+      });
     }
   }
   if (topPredictions.length === 0) {
     // top_predictions is supplementary; guarantee at least the primary
     // (already-validated) prediction is present rather than failing the
     // whole response over a missing/malformed supplementary list.
-    topPredictions.push({ className, modelConfidence });
+    topPredictions.push({ className, classIndex, modelConfidence });
   }
+  // Defensive, persistence-boundary-grade bounds: sorted descending, capped
+  // to MAX_TOP_PREDICTIONS, even though the upstream service already
+  // returns at most 3 sorted entries by contract.
+  topPredictions.sort((a, z) => z.modelConfidence - a.modelConfidence);
+  const boundedTopPredictions = topPredictions.slice(0, MAX_TOP_PREDICTIONS);
 
   const limitations = Array.isArray(b.limitations)
     ? b.limitations.filter((l: unknown): l is string => typeof l === "string")
@@ -161,13 +201,17 @@ function validateAndNormalize(body: unknown): CustomMlNormalizedResult {
 
   return {
     disease: className,
+    classIndex,
     modelConfidence,
     accepted,
     uncertain,
     confidenceLabel: "model confidence",
     productionCalibrated: false,
     supportedClass: true,
-    topPredictions,
+    confidenceThreshold: EXPECTED_THRESHOLD,
+    confidenceMethod,
+    topPredictions: boundedTopPredictions,
+    model: CUSTOM_ML_MODEL_INFO,
     limitations,
     ...classBreakdown(className),
   };
