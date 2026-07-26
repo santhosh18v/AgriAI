@@ -1,13 +1,14 @@
 # AgriAI ml-service
 
 Python service for the Phase 2 custom crop-disease classifier. Through
-**Milestone M5**, this covers dataset preparation, an approved deterministic
+**Milestone M6**, this covers dataset preparation, an approved deterministic
 train/validation/test split, a first reproducible EfficientNet-B0 training
-baseline, and a one-time frozen test evaluation with a validation-selected
-confidence threshold. There is still no running FastAPI service and no
-Next.js integration — those are later milestones.
+baseline, a one-time frozen test evaluation with a validation-selected
+confidence threshold, and a running FastAPI service foundation (health,
+readiness, model-info). There is still no image upload or disease-prediction
+endpoint, and no Next.js integration — those are later milestones.
 
-## What exists through M5
+## What exists through M6
 
 - `requirements.txt` — pinned runtime/inference dependencies (FastAPI,
   Pillow, PyTorch, etc), for the not-yet-built inference service.
@@ -16,10 +17,15 @@ Next.js integration — those are later milestones.
   pytest, imagehash, etc), with Python-3.13/arm64-compatible version pins.
   See `docs/MODEL_TRAINING.md` for the compatibility note explaining why
   its pins differ from `requirements.txt`.
-- `.env.example` — names and safe placeholder values for `MODEL_PATH` and
-  `LOG_LEVEL`. No real secrets.
-- `app/config.py`, `app/schemas.py` — inference-service scaffolding from
-  M1. No routes wired up yet; serving is a later milestone.
+- `.env.example` — names and safe placeholder values for the `AGRI_ML_`-
+  prefixed settings (see `docs/API_FOUNDATION.md`). No real secrets.
+- `app/` — the M6 FastAPI service foundation: `main.py` (app + lifespan +
+  CORS), `config.py` (pydantic-settings), `model_loader.py` (validated,
+  load-once model loading), `schemas.py`, `dependencies.py`, and
+  `routes/health.py` / `routes/model_info.py`. See
+  `docs/API_FOUNDATION.md` for endpoints, configuration, and the
+  model-loading lifecycle. There is no image upload or `/predict/disease`
+  endpoint yet — that is M7.
 - `training/class_map.json` — the 8 approved classes (Tomato/Potato/Corn),
   frozen index-to-label mapping, unchanged since M1.
 - `training/model_scope_v1.json`, `training/tomato_grouping_policy_v1.json`,
@@ -42,6 +48,9 @@ Next.js integration — those are later milestones.
   decision record. See `docs/MODEL_EVALUATION.md` for full results.
 - `tests/training/` — pytest suite for the M4/M5 pipeline, using tiny
   synthetic images/manifests only (no real dataset images are tracked).
+- `tests/api/` — pytest suite for the M6 API foundation, using tiny
+  synthetic checkpoints only (the real ~48MB checkpoint is never loaded by
+  an automated test).
 
 ## Dataset
 
@@ -68,10 +77,20 @@ reproduction commands are documented in
 **[`docs/MODEL_EVALUATION.md`](docs/MODEL_EVALUATION.md)**. `test.csv` has
 now been evaluated exactly once and must not be evaluated again.
 
+## API foundation (M6)
+
+The FastAPI service foundation — health, readiness, and model-information
+endpoints, configuration, and safe model loading — is documented in
+**[`docs/API_FOUNDATION.md`](docs/API_FOUNDATION.md)**.
+
+```bash
+cd ml-service
+.venv/bin/python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+```
+
 ## What does NOT exist yet (later milestones)
 
-- No FastAPI app (`app/main.py`, `app/routers/`, `app/inference.py`) and no
-  running server — M6/M7.
+- No image upload endpoint and no `/predict/disease` endpoint — M7.
 - No integration with the Next.js app — M8/M9.
 
 ## Approved classes (fixed, do not add without approval)

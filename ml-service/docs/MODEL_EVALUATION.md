@@ -315,8 +315,10 @@ is committed.
 
 ## Status
 
-**M6 (FastAPI inference service) has not started.** No production-readiness
-claim is made for this baseline. The frozen threshold (0.50) currently
-performs no rejection at all on the observed test set and should not be
-assumed to generalize to future, harder or out-of-distribution images
-without further review.
+**M6 built the FastAPI service foundation** (health, readiness, and
+model-info endpoints only — see `docs/API_FOUNDATION.md`); there is still
+no image upload or `/predict/disease` endpoint, and M7 has not started. No
+production-readiness claim is made for this baseline. The frozen threshold
+(0.50) currently performs no rejection at all on the observed test set and
+should not be assumed to generalize to future, harder or out-of-distribution
+images without further review.
