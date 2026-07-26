@@ -7,6 +7,7 @@ import { ImageDropzone } from "./ImageDropzone";
 import { CameraCapture } from "./CameraCapture";
 import { AnalysisResultCard } from "./AnalysisResultCard";
 import { cn } from "@/lib/auth";
+import { PersistedCustomMl, PersistedSecondaryOpinion, ProviderMetadata } from "@/lib/disease-analysis/types";
 
 const analysisTypes = [
   { value: "crop_disease", label: "Crop Disease", icon: Leaf },
@@ -25,6 +26,9 @@ export function CropScanner() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [aiProvider, setAiProvider] = useState<string>("");
+  const [customMl, setCustomMl] = useState<PersistedCustomMl | undefined>(undefined);
+  const [providerMetadata, setProviderMetadata] = useState<ProviderMetadata | undefined>(undefined);
+  const [secondaryOpinion, setSecondaryOpinion] = useState<PersistedSecondaryOpinion | undefined>(undefined);
   const [scanMode, setScanMode] = useState<"upload" | "camera">("upload");
 
   const handleImageSelect = (selectedFile: File) => {
@@ -45,6 +49,9 @@ export function CropScanner() {
 
     setLoading(true);
     setResult(null);
+    setCustomMl(undefined);
+    setProviderMetadata(undefined);
+    setSecondaryOpinion(undefined);
 
     try {
       const formData = new FormData();
@@ -72,6 +79,9 @@ export function CropScanner() {
 
       setResult(data.result);
       setAiProvider(data.aiProvider);
+      setCustomMl(data.customMl);
+      setProviderMetadata(data.providerMetadata);
+      setSecondaryOpinion(data.secondaryOpinion);
       toast.success("Analysis complete!");
     } catch (error) {
       toast.error("Something went wrong. Please try again.");
@@ -225,7 +235,13 @@ export function CropScanner() {
 
       {/* Result */}
       {result && !loading && (
-        <AnalysisResultCard result={result} aiProvider={aiProvider} />
+        <AnalysisResultCard
+          result={result}
+          aiProvider={aiProvider}
+          customMl={customMl}
+          providerMetadata={providerMetadata}
+          secondaryOpinion={secondaryOpinion}
+        />
       )}
     </div>
   );

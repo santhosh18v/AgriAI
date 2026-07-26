@@ -6,6 +6,17 @@ import { fastAnalysisWithGroq } from "@/lib/groq";
 import connectDB from "@/lib/mongodb";
 import Analysis from "@/models/Analysis";
 import User from "@/models/User";
+import { parseAIResponse } from "@/lib/disease-analysis/providers/gemini";
+import { runDiseaseAnalysis } from "@/lib/disease-analysis/service";
+import { getDiseaseAnalysisConfig, DiseaseAnalysisConfigError } from "@/lib/disease-analysis/config";
+import {
+  buildDiseaseAnalysisPersistenceInput,
+  DiseaseAnalysisPersistenceInput,
+  PersistenceValidationError,
+} from "@/lib/disease-analysis/persistence";
+import { DiseaseAnalysisError, DiseaseAnalysisOutcome } from "@/lib/disease-analysis/types";
+
+type PersistedAiProvider = "gemini" | "groq" | "combined" | "custom-ml";
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,9 +37,51 @@ export async function POST(request: NextRequest) {
     }
 
     let rawResponse = "";
-    let aiProvider: "gemini" | "groq" | "combined" = "gemini";
+    let aiProvider: PersistedAiProvider = "gemini";
+    let diseaseOutcome: DiseaseAnalysisOutcome | null = null;
 
-    if (image && provider !== "groq") {
+    // Milestone M8: the custom ML disease-prediction service is only ever
+    // considered for the crop-disease image-analysis case, and only when
+    // explicitly selected via server-side configuration -- every other
+    // existing path (pest/soil/weather/waste image analysis, Groq, and
+    // text-only Gemini) is completely unchanged below.
+    let useCustomMlFlow = false;
+    if (image && provider !== "groq" && type === "crop_disease") {
+      try {
+        useCustomMlFlow = getDiseaseAnalysisConfig().provider === "custom-ml";
+      } catch (configError) {
+        if (configError instanceof DiseaseAnalysisConfigError) {
+          console.error("Disease analysis configuration error:", configError.message);
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "DISEASE_ANALYSIS_FAILED",
+                message: "Disease analysis is temporarily unavailable.",
+              },
+            },
+            { status: 500 }
+          );
+        }
+        throw configError;
+      }
+    }
+
+    if (useCustomMlFlow) {
+      try {
+        diseaseOutcome = await runDiseaseAnalysis({ file: image as File, query, cropName });
+        rawResponse = diseaseOutcome.legacy.rawResponse;
+      } catch (err) {
+        if (err instanceof DiseaseAnalysisError) {
+          console.error("Disease analysis provider error:", err.code, err.message);
+          return NextResponse.json(
+            { success: false, error: { code: err.code, message: err.message } },
+            { status: err.httpStatus }
+          );
+        }
+        throw err;
+      }
+    } else if (image && provider !== "groq") {
       // Image analysis with Gemini Vision
       const bytes = await image.arrayBuffer();
       const base64 = Buffer.from(bytes).toString("base64");
@@ -62,10 +115,52 @@ Please structure your response clearly with these sections.`;
       aiProvider = "gemini";
     }
 
-    // Parse the response into structured data
-    const parsed = parseAIResponse(rawResponse);
+    // Parse the response into structured data (already parsed for the
+    // custom-ml flow -- diseaseOutcome.legacy is used directly there).
+    const parsed = diseaseOutcome
+      ? {
+          diagnosis: diseaseOutcome.legacy.diagnosis,
+          severity: diseaseOutcome.legacy.severity,
+          confidence: diseaseOutcome.legacy.confidence,
+          treatment: diseaseOutcome.legacy.treatment,
+          prevention: diseaseOutcome.legacy.prevention,
+          expertAdvice: diseaseOutcome.legacy.expertAdvice,
+        }
+      : parseAIResponse(rawResponse);
 
-    // Save to MongoDB
+    // Milestone M9: build + independently re-validate the persistence input
+    // for a disease-analysis outcome BEFORE ever calling Analysis.create.
+    // This does NOT trust diseaseOutcome/customMl as already-safe just
+    // because providers/custom-ml.ts validated it once -- every invariant
+    // is re-checked from scratch at this boundary (see persistence.ts). A
+    // validation failure here must not persist a partial or inconsistent
+    // document and must not increment analysisCount.
+    let persistenceInput: DiseaseAnalysisPersistenceInput | null = null;
+    if (diseaseOutcome) {
+      try {
+        persistenceInput = buildDiseaseAnalysisPersistenceInput(diseaseOutcome);
+      } catch (err) {
+        if (err instanceof PersistenceValidationError) {
+          console.error("Disease analysis persistence validation failed:", err.message);
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "DISEASE_ANALYSIS_FAILED",
+                message: "Disease analysis is temporarily unavailable.",
+              },
+            },
+            { status: 500 }
+          );
+        }
+        throw err;
+      }
+      // `aiProvider` (the honest persisted enum value) always comes from
+      // providerMetadata now -- the single source of truth shared with the
+      // immediate response below, so the two can never diverge.
+      aiProvider = persistenceInput.providerMetadata.persistedProvider;
+    }
+
     await connectDB();
     const analysis = await Analysis.create({
       userId: (session.user as any).id,
@@ -77,99 +172,49 @@ Please structure your response clearly with these sections.`;
         ...parsed,
         rawResponse,
       },
+      ...(persistenceInput?.customMl ? { customMl: persistenceInput.customMl } : {}),
+      ...(persistenceInput ? { providerMetadata: persistenceInput.providerMetadata } : {}),
+      ...(persistenceInput?.secondaryOpinion ? { secondaryOpinion: persistenceInput.secondaryOpinion } : {}),
+      ...(persistenceInput ? { resultVersion: persistenceInput.resultVersion } : {}),
       tags: extractTags(query, cropName, type),
     });
+    const analysisId: string = analysis._id;
 
-    // Increment user analysis count
+    // Increment user analysis count -- only reached after Analysis.create()
+    // succeeds; a persistence failure above throws and is handled by the
+    // outer try/catch, which never increments the count and never returns
+    // success:true (unchanged from pre-M8 behavior).
     await User.findByIdAndUpdate((session.user as any).id, {
       $inc: { analysisCount: 1 },
     });
 
+    // Milestone M9: the immediate response reuses the exact same
+    // persistenceInput fields (customMl/providerMetadata/secondaryOpinion/
+    // resultVersion) that were just written to MongoDB -- not a
+    // separately-shaped summary -- so the immediate response and the
+    // history response can never describe the same request differently.
     return NextResponse.json({
       success: true,
-      analysisId: analysis._id,
+      analysisId,
       result: {
         ...parsed,
         rawResponse,
       },
-      aiProvider,
+      aiProvider: diseaseOutcome ? diseaseOutcome.provider : aiProvider,
+      ...(persistenceInput?.customMl ? { customMl: persistenceInput.customMl } : {}),
+      ...(persistenceInput ? { providerMetadata: persistenceInput.providerMetadata } : {}),
+      ...(persistenceInput?.secondaryOpinion ? { secondaryOpinion: persistenceInput.secondaryOpinion } : {}),
+      ...(persistenceInput ? { resultVersion: persistenceInput.resultVersion } : {}),
     });
   } catch (error: any) {
+    // Milestone M9 (Section 15 security fix): never interpolate
+    // error.message (or any other internal detail -- stack traces,
+    // upstream URLs, Mongo error text) into the client-facing response.
+    // Full detail is logged server-side only; the client always gets the
+    // same generic, safe message and a stable 500 status.
     console.error("Analyze error:", error);
-    return NextResponse.json(
-      { error: `Analysis failed: ${error?.message || error}` },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Analysis failed. Please try again later." }, { status: 500 });
   }
-}
-
-function parseAIResponse(response: string) {
-  // Find all matches with their index in the string
-  const regex = /(?:^|\n)[#\*\s\-\d\.]*(DIAGNOSIS|SEVERITY|CONFIDENCE|AFFECTED AREA|TREATMENT|PREVENTION|EXPERT ADVICE|EXPERT|CONSULT)[:\s\*\-]*/gi;
-  
-  const matches: { name: string; index: number; endIndex: number }[] = [];
-  let match;
-  while ((match = regex.exec(response)) !== null) {
-    matches.push({
-      name: match[1].toUpperCase(),
-      index: match.index,
-      endIndex: regex.lastIndex
-    });
-  }
-
-  // Helper to extract content between a match and the next match
-  function getContentForSection(sectionNames: string[]) {
-    const found = matches.find(m => sectionNames.includes(m.name));
-    if (!found) return null;
-    
-    // Find the next match that starts after this one
-    let nextMatch = null;
-    for (const m of matches) {
-      if (m.index > found.index) {
-        nextMatch = m;
-        break;
-      }
-    }
-    
-    const start = found.endIndex;
-    const end = nextMatch ? nextMatch.index : response.length;
-    return response.substring(start, end).trim();
-  }
-
-  const diagnosis = getContentForSection(["DIAGNOSIS"]);
-  const severityStr = getContentForSection(["SEVERITY"]);
-  const confidenceStr = getContentForSection(["CONFIDENCE"]);
-  const treatment = getContentForSection(["TREATMENT"]);
-  const prevention = getContentForSection(["PREVENTION"]);
-  const expertAdvice = getContentForSection(["EXPERT ADVICE", "EXPERT", "CONSULT"]);
-
-  // Extract severity value
-  let severity: "critical" | "high" | "medium" | "low" | "healthy" = "medium";
-  if (severityStr) {
-    const sevMatch = severityStr.match(/(critical|high|medium|low|healthy)/i);
-    if (sevMatch) severity = sevMatch[1].toLowerCase() as any;
-  }
-
-  // Extract confidence value
-  let confidence = 75;
-  if (confidenceStr) {
-    const confMatch = confidenceStr.match(/(\d+)/);
-    if (confMatch) confidence = parseInt(confMatch[1]);
-  }
-
-  return {
-    diagnosis: diagnosis || extractFirstMeaningfulParagraph(response),
-    severity,
-    confidence,
-    treatment: treatment || "Please consult the full analysis below.",
-    prevention: prevention || "Follow standard agricultural best practices.",
-    expertAdvice: expertAdvice || undefined,
-  };
-}
-
-function extractFirstMeaningfulParagraph(text: string): string {
-  const lines = text.split("\n").filter((l) => l.trim().length > 20);
-  return lines[0] || text.substring(0, 200);
 }
 
 function extractTags(query: string, cropName: string, type: string): string[] {

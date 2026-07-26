@@ -12,6 +12,16 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/auth";
+import { PersistedCustomMl, PersistedSecondaryOpinion, ProviderMetadata } from "@/lib/disease-analysis/types";
+import {
+  CustomMlSafetyNotes,
+  CustomMlStatusBadge,
+  FallbackNote,
+  SecondaryOpinionNote,
+  TopPredictionsList,
+  formatPercent,
+  providerLabel,
+} from "./custom-ml-shared";
 
 interface AnalysisResult {
   diagnosis: string;
@@ -35,10 +45,18 @@ export function AnalysisResultCard({
   result,
   aiProvider,
   analysisId,
+  customMl,
+  providerMetadata,
+  secondaryOpinion,
 }: {
   result: AnalysisResult;
   aiProvider: string;
   analysisId?: string;
+  /** Milestone M9: only present when the custom-ml classifier actually
+   * produced a valid result for this analysis. */
+  customMl?: PersistedCustomMl;
+  providerMetadata?: ProviderMetadata;
+  secondaryOpinion?: PersistedSecondaryOpinion;
 }) {
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const config = severityConfig[result.severity] || severityConfig.medium;
@@ -59,8 +77,9 @@ export function AnalysisResultCard({
               </span>
               <span className="tag flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
-                {aiProvider === "gemini" ? "Gemini Vision" : "Groq Llama 3"}
+                {providerLabel(aiProvider)}
               </span>
+              {customMl && <CustomMlStatusBadge customMl={customMl} />}
             </div>
             <h3 className="text-xl font-semibold leading-snug">{result.diagnosis}</h3>
           </div>
@@ -71,6 +90,67 @@ export function AnalysisResultCard({
           <p className="text-xs text-white/40">confidence</p>
         </div>
       </div>
+
+      {/* Milestone M9: custom-ml model detail panel -- only rendered when
+          the custom model actually produced this result. An uncertain
+          result gets a visible warning banner here, never phrased as a
+          confirmed diagnosis. */}
+      {customMl && (
+        <div className="mb-6 space-y-4">
+          {customMl.uncertain && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-200/90 leading-relaxed">
+                This is a <strong>low-confidence model result</strong>, not a confirmed diagnosis.
+                Consider a clearer photo or expert verification before acting on it.
+              </p>
+            </div>
+          )}
+
+          <div className="bg-white/[0.03] rounded-xl p-5 grid sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-white/40 mb-1">Predicted class</p>
+              <p className="text-sm font-medium">{customMl.className}</p>
+            </div>
+            <div>
+              <p className="text-xs text-white/40 mb-1">Crop / condition</p>
+              <p className="text-sm font-medium">
+                {customMl.crop} &middot; {customMl.condition}{" "}
+                <span className={customMl.healthy ? "text-forest-400" : "text-amber-400"}>
+                  ({customMl.healthy ? "healthy" : "disease detected"})
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-white/40 mb-1">Model confidence</p>
+              <p className="text-sm font-medium">
+                {formatPercent(customMl.modelConfidence)}{" "}
+                <span className="text-white/40 font-normal">
+                  (acceptance threshold {formatPercent(customMl.confidenceThreshold)})
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-white/40 mb-1">Top predictions</p>
+              <TopPredictionsList topPredictions={customMl.topPredictions} />
+            </div>
+          </div>
+
+          <CustomMlSafetyNotes customMl={customMl} />
+
+          {secondaryOpinion && <SecondaryOpinionNote secondaryOpinion={secondaryOpinion} />}
+          {providerMetadata && <FallbackNote providerMetadata={providerMetadata} />}
+        </div>
+      )}
+
+      {/* Milestone M9: a full infrastructure fallback (no customMl at all)
+          still deserves an honest note that the custom model was attempted
+          first. */}
+      {!customMl && providerMetadata?.fallbackUsed && (
+        <div className="mb-6">
+          <FallbackNote providerMetadata={providerMetadata} />
+        </div>
+      )}
 
       {/* Treatment & Prevention */}
       <div className="grid md:grid-cols-2 gap-4 mb-6">

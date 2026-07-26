@@ -1,0 +1,24 @@
+# Runtime / inference dependencies for the FastAPI ml-service (Milestone
+# M6 foundation: health/readiness/model-info only, no inference endpoint
+# yet). Training/evaluation-only dependencies live in requirements-training.txt.
+#
+# M6 compatibility note: the original M1 pins (fastapi==0.111.0,
+# pydantic==2.7.4, torch==2.3.1, torchvision==0.18.1, numpy==1.26.4) predate
+# this project's actual Python 3.13/arm64 environment and, for torch/
+# torchvision/numpy, do not publish cp313 wheels at all (see
+# docs/MODEL_TRAINING.md's compatibility note from M4). This file is updated
+# to the same torch/torchvision/numpy/Pillow versions already verified and
+# used by requirements-training.txt, plus current fastapi/uvicorn/pydantic
+# releases with cp313 wheels, verified via `pip install --dry-run` against
+# this project's ml-service/.venv on 2026-07-26. pydantic-settings is added
+# for M6's typed environment-variable configuration (app/config.py).
+
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.4
+pydantic-settings==2.7.0
+pillow==10.4.0
+python-multipart==0.0.20
+numpy==2.5.1
+torch==2.7.1
+torchvision==0.22.1

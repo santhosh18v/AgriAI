@@ -31,3 +31,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 .DS_Store
+
+# ml-service (Python) - virtual envs, caches, local env file
+ml-service/venv/
+ml-service/.venv/
+ml-service/**/__pycache__/
+ml-service/**/*.pyc
+ml-service/.env
+
+# ml-service datasets and generated split manifests (never committed)
+ml-service/data/
+
+# ml-service trained model artifacts and generated metadata (never committed)
+ml-service/models/
+*.pt
+*.pth
+*.onnx

@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "status": "approved",
+  "decision_source": "user_explicit_approval",
+  "approval_date_utc": "2026-07-25T14:17:39Z",
+  "source_milestone": "M3B-3A",
+  "meaning": "A similarity_guard_group is a split-safety constraint only. It forces the original groups it links into the SAME train/validation/test partition. It does NOT claim the linked images are the same physical leaf. It does NOT overwrite, replace, or modify any authoritative leaf_id. It does NOT replace or modify any approved Tomato filename-family group key. Every image's original group_key and group_source are preserved unchanged in all manifests and reports -- a similarity_guard_group is an additional, separate column recorded alongside them, never a substitute for them.",
+  "guards": [
+    {
+      "guard_group_id": "similarity-guard-phash-2623",
+      "source_phash_cluster_id": "phash-2623",
+      "class_name": "Potato Early Blight",
+      "original_group_keys": [
+        "Potato___Early_blight:::157.0",
+        "Potato___Early_blight:::164.0"
+      ],
+      "image_filenames": [
+        "1c4e0445-375a-4c5d-b6fd-6123d22f009f___RS_Early.B 7972.JPG",
+        "49b24f9e-12d4-4f32-8bc8-482d66514a17___RS_Early.B 8037.JPG"
+      ],
+      "members": [
+        {
+          "filename": "1c4e0445-375a-4c5d-b6fd-6123d22f009f___RS_Early.B 7972.JPG",
+          "path": "data/raw/plantvillage-source/raw/color/Potato___Early_blight/1c4e0445-375a-4c5d-b6fd-6123d22f009f___RS_Early.B 7972.JPG",
+          "original_group_key": "Potato___Early_blight:::157.0"
+        },
+        {
+          "filename": "49b24f9e-12d4-4f32-8bc8-482d66514a17___RS_Early.B 8037.JPG",
+          "path": "data/raw/plantvillage-source/raw/color/Potato___Early_blight/49b24f9e-12d4-4f32-8bc8-482d66514a17___RS_Early.B 8037.JPG",
+          "original_group_key": "Potato___Early_blight:::164.0"
+        }
+      ],
+      "phash_distance": 4,
+      "exact_duplicate": false,
+      "conflicting_labels": false,
+      "different_authoritative_leaf_ids": true,
+      "reason": "M3B-3A visual inspection found the two images closely matching in leaf outline, lesion distribution, and background/lighting, despite carrying different authoritative leaf_ids (157.0 vs 164.0) in the upstream leaf-counting metadata. Not currently cross-split under the prior (pre-guard) allocation, both landed in train by coincidence, not by any enforced policy. Applied as a precautionary split-safety measure.",
+      "common_physical_leaf_identity_asserted": false
+    },
+    {
+      "guard_group_id": "similarity-guard-phash-4306",
+      "source_phash_cluster_id": "phash-4306",
+      "class_name": "Potato Late Blight",
+      "original_group_keys": [
+        "Potato___Late_blight:::207.0",
+        "Potato___Late_blight:::171.0"
+      ],
+      "image_filenames": [
+        "c89d5a2a-2c1e-496e-84b8-b7a844a97ac9___RS_LB 4920.JPG",
+        "f528b00d-99a6-41db-8d96-9eed58b519c1___RS_LB 4544.JPG"
+      ],
+      "members": [
+        {
+          "filename": "c89d5a2a-2c1e-496e-84b8-b7a844a97ac9___RS_LB 4920.JPG",
+          "path": "data/raw/plantvillage-source/raw/color/Potato___Late_blight/c89d5a2a-2c1e-496e-84b8-b7a844a97ac9___RS_LB 4920.JPG",
+          "original_group_key": "Potato___Late_blight:::207.0"
+        },
+        {
+          "filename": "f528b00d-99a6-41db-8d96-9eed58b519c1___RS_LB 4544.JPG",
+          "path": "data/raw/plantvillage-source/raw/color/Potato___Late_blight/f528b00d-99a6-41db-8d96-9eed58b519c1___RS_LB 4544.JPG",
+          "original_group_key": "Potato___Late_blight:::171.0"
+        }
+      ],
+      "phash_distance": 4,
+      "exact_duplicate": false,
+      "conflicting_labels": false,
+      "different_authoritative_leaf_ids": true,
+      "reason": "M3B-3A visual inspection found these two images the least visually similar of the three flagged clusters -- different curl/wilt stage, lesion shape, and leaf orientation -- plausibly two genuinely different leaves that pHash flagged on coarse structure/color rather than fine content. Different authoritative leaf_ids (207.0 vs 171.0). Not currently cross-split, both landed in train by coincidence. Applied uniformly with the other two guards as a low-cost, consistent, easily-auditable policy rather than a case-by-case judgment call, even though disclosure-only would also have been defensible for this specific pair.",
+      "common_physical_leaf_identity_asserted": false
+    },
+    {
+      "guard_group_id": "similarity-guard-phash-6432",
+      "source_phash_cluster_id": "phash-6432",
+      "class_name": "Tomato Late Blight",
+      "original_group_keys": [
+        "tlb::GHLB2::Leaf8836",
+        "tlb::GHLB2::Leaf8837"
+      ],
+      "image_filenames": [
+        "2159d0f7-09ef-46ad-ad49-749e8ce1becc___GHLB2 Leaf 8836.JPG",
+        "7f533ee8-1d72-486e-b2a6-b5ef2ac7cc88___GHLB2 Leaf 8837.JPG"
+      ],
+      "members": [
+        {
+          "filename": "2159d0f7-09ef-46ad-ad49-749e8ce1becc___GHLB2 Leaf 8836.JPG",
+          "path": "data/raw/plantvillage-source/raw/color/Tomato___Late_blight/2159d0f7-09ef-46ad-ad49-749e8ce1becc___GHLB2 Leaf 8836.JPG",
+          "original_group_key": "tlb::GHLB2::Leaf8836"
+        },
+        {
+          "filename": "7f533ee8-1d72-486e-b2a6-b5ef2ac7cc88___GHLB2 Leaf 8837.JPG",
+          "path": "data/raw/plantvillage-source/raw/color/Tomato___Late_blight/7f533ee8-1d72-486e-b2a6-b5ef2ac7cc88___GHLB2 Leaf 8837.JPG",
+          "original_group_key": "tlb::GHLB2::Leaf8837"
+        }
+      ],
+      "phash_distance": 4,
+      "exact_duplicate": false,
+      "conflicting_labels": false,
+      "different_authoritative_leaf_ids": null,
+      "reason": "M3B-3A visual inspection found these two images near-identical -- same distinctive scalloped leaf silhouette, same lesion position/color, same background, same small debris speck in the same position. Neither image has an authoritative leaf_id (both were originally unmatched in the M3A leaf-map join and resolved only via the M3B-2 filename-family rule as two separate singleton groups, since 'Leaf 8836' and 'Leaf 8837' are adjacent but different leaf numbers under the tlb:: grouping key). Under the prior (pre-guard) allocation this pair was ACTUALLY cross-split: Leaf8836 assigned to train, Leaf8837 assigned to validation -- a real, live near-duplicate leakage risk, not merely a hypothetical one. This guard is the mandatory case among the three.",
+      "common_physical_leaf_identity_asserted": false
+    }
+  ],
+  "constraints": {
+    "no_cross_class_guards": "Every guard's original_group_keys belong to images of a single class_name; no guard links groups across different classes.",
+    "no_overlapping_guards": "No original_group_key appears in more than one guard_group_id in this file.",
+    "does_not_overwrite_authoritative_data": "This file does not modify training/class_map.json, training/model_scope_v1.json, or training/tomato_grouping_policy_v1.json, and does not change any leaf_id or filename-family group_key recorded elsewhere."
+  }
+}

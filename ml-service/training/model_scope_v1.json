@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "status": "approved",
+  "decision_source": "user_explicit_approval",
+  "approval_date_utc": "2026-07-25T13:46:49Z",
+  "original_available_classes": [
+    "Tomato Healthy",
+    "Tomato Early Blight",
+    "Tomato Late Blight",
+    "Potato Healthy",
+    "Potato Early Blight",
+    "Potato Late Blight",
+    "Corn Healthy",
+    "Corn Common Rust"
+  ],
+  "original_available_class_count": 8,
+  "active_model_classes": [
+    "Tomato Healthy",
+    "Tomato Early Blight",
+    "Tomato Late Blight",
+    "Potato Healthy",
+    "Potato Early Blight",
+    "Potato Late Blight"
+  ],
+  "active_model_class_count": 6,
+  "excluded_classes": [
+    "Corn Healthy",
+    "Corn Common Rust"
+  ],
+  "exclusion_reasons": {
+    "Corn Healthy": "No authoritative physical-leaf grouping metadata exists in the approved PlantVillage source (leaf-map.json and every leaf_grouping/ source file contain zero Corn entries, verified by direct inspection during M3B planning). The 'copy N' filename suffix present on most Corn Healthy files is an undocumented, unverified heuristic, not authoritative evidence, and was not used to include this class.",
+    "Corn Common Rust": "No authoritative physical-leaf grouping metadata exists in the approved PlantVillage source (same as Corn Healthy). Additionally, filenames (RS_Rust <N>.JPG) are 1,192 unique, non-repeating sequential numbers and provide no usable grouping signal of any kind -- not even a weak filename heuristic exists for this class."
+  },
+  "exclusion_is_not_a_data_quality_judgment": "Exclusion reflects a grouping/train-test-leakage-prevention limitation, not an assessment that the Corn images themselves are invalid, low quality, or unusable. Corn may return in a future model once defensible grouping metadata is obtained (e.g. a manual leaf-counting effort) or an external validation dataset becomes available to substitute for grouped train/test evaluation.",
+  "relationship_to_class_map_json": "training/class_map.json is NOT modified by this file and continues to define all 8 originally approved classes unchanged. This file is a training-time scope filter applied on top of that unchanged class list, not a redefinition of it.",
+  "supersedes": "ml-service/training/model_scope_v1.proposed.json (kept unmodified as the historical proposal record, not deleted or overwritten)",
+  "source_milestone": "M3B-2",
+  "decision_history": [
+    {
+      "question": "Approve the proposed 6-class first-model scope (excluding both Corn classes)?",
+      "answer": "approved"
+    }
+  ]
+}

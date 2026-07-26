@@ -1,0 +1,62 @@
+# Training / evaluation dependencies. Superset of requirements.txt.
+#
+# M4 compatibility note: this file used to do `-r requirements.txt` and add
+# extras on top. requirements.txt pins torch==2.3.1 / torchvision==0.18.1 /
+# numpy==1.26.4, none of which publish wheels for Python 3.13 (the actual
+# interpreter on this dev machine, arm64 macOS) -- `pip install` fails
+# outright on those three. Per the M4 instructions, requirements.txt itself
+# is NOT modified (it documents the intended runtime/FastAPI stack for a
+# not-yet-built inference service, a separate milestone). Instead, this file
+# now restates the full dependency set directly with the smallest version
+# bumps needed for Python 3.13/arm64 wheels to exist, verified via
+# `pip install --dry-run` against this project's ml-service/.venv on
+# 2026-07-25. Every other pin is unchanged from requirements.txt.
+#
+# torch==2.7.1 / torchvision==0.22.1 is an exact, verified pair (torchvision
+# 0.22.1's own metadata requires torch==2.7.1). scikit-learn 1.5.2 is the
+# first 1.5.x patch with a cp313 wheel. matplotlib 3.9.2 is the first 3.9.x
+# patch with a cp313 wheel. numpy 2.5.1 matches the version already
+# installed and exercised by imagehash/M3A in this project's venv.
+#
+# M6 sync note (2026-07-26): requirements.txt's fastapi/uvicorn/pydantic/
+# python-multipart pins were updated for the FastAPI service foundation,
+# and pydantic-settings was added (app/config.py). This section is updated
+# to match verbatim, per this section's own "keep in sync" rule above --
+# previously it still pinned the pre-M6 versions (fastapi==0.111.0,
+# pydantic==2.7.4, etc.) and omitted pydantic-settings entirely, which
+# would have broken `import app.config` (and therefore `pytest tests/api`)
+# on a fresh install from this file.
+
+# --- restated runtime deps (see note above; keep in sync with requirements.txt
+#     for any package that does NOT need a Python-3.13 compatibility bump) ---
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.4
+pydantic-settings==2.7.0
+pillow==10.4.0
+python-multipart==0.0.20
+numpy==2.5.1
+torch==2.7.1
+torchvision==0.22.1
+
+# --- training/evaluation-only extras ---
+scikit-learn==1.5.2
+pandas==2.2.2
+matplotlib==3.9.2
+seaborn==0.13.2
+tqdm==4.66.4
+imagehash==4.3.1
+pytest==8.2.2
+
+# --- M6 API test extra ---
+# This file is, by established project convention (see README.md), the
+# actual shared dependency set installed into ml-service/.venv for all
+# development and testing -- not narrowly "training only" (pytest itself
+# has lived here since before any training code existed). httpx is
+# required transitively by fastapi.testclient.TestClient, used by
+# tests/api/ (Milestone M6). It is deliberately not added to
+# requirements.txt, which is the runtime-only dependency set the deployed
+# service itself installs -- the service has no test-client code path.
+# Verified via `pip install --dry-run` against this project's
+# ml-service/.venv on 2026-07-26.
+httpx==0.28.1

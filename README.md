@@ -4,7 +4,7 @@ A full-stack Next.js 14 application built for the **AI Model Development Contest
 
 ## ✨ Features
 
-- **Crop Disease Detection** — Upload a photo, get instant diagnosis via Gemini Vision
+- **Crop Disease Detection** — Upload a photo, get instant diagnosis via Gemini Vision, or (behind a feature flag, see below) AgriAI's own custom EfficientNet-B0 model for six Tomato/Potato classes
 - **Pest Identification** — Identify pests and get organic/chemical control advice
 - **Soil Health Advisor** — Structured form-based soil assessment with AI recommendations
 - **AI Advisory Chat** — Real-time chat powered by Groq (fast) or Gemini (deep reasoning)
@@ -66,6 +66,55 @@ Open [http://localhost:3000](http://localhost:3000).
 npm run build
 npm start
 ```
+
+### 5. Run tests
+
+```bash
+npm test
+```
+
+## 🧠 Phase 2: custom ML disease-prediction service (optional, feature-flagged)
+
+AgriAI includes its own trained **EfficientNet-B0** crop-disease classifier
+(`ml-service/`, a separate Python/FastAPI service — see
+`ml-service/README.md`), covering **six classes**: Tomato Healthy/Early
+Blight/Late Blight and Potato Healthy/Early Blight/Late Blight. Phase 2
+(M1–M11) is complete, including a real, authenticated end-to-end
+validation pass against the running services. It is **disabled by
+default** and integrated behind a server-side feature flag — Gemini
+remains the default and fallback provider; this is purely additive, with
+no UI redesign required to use it.
+
+**Final controlled-test metrics** (one-time frozen evaluation, 991 held-out
+images): **98.89% accuracy, 0.9841 macro-F1**, at a validation-selected
+confidence threshold of **0.50**. These describe performance on a
+controlled, lab-style image dataset — **not** a claim of real-farm-photo
+or production-ready performance; confidence is a model score, not
+certainty (see [`docs/CUSTOM_ML_LIMITATIONS.md`](docs/CUSTOM_ML_LIMITATIONS.md)).
+
+```bash
+# Terminal 1 — FastAPI must be running for custom-ml mode to work
+cd ml-service && source .venv/bin/activate
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+
+# Terminal 2 — Next.js (with CUSTOM_ML_ENABLED=true, DISEASE_ANALYSIS_PROVIDER=custom-ml in .env.local)
+npm run dev
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DISEASE_ANALYSIS_PROVIDER` | `gemini` | `"gemini"` or `"custom-ml"` |
+| `CUSTOM_ML_ENABLED` | `false` | Master kill-switch for the custom-ml provider |
+| `CUSTOM_ML_SERVICE_URL` | `http://127.0.0.1:8001` | ml-service base URL |
+| `CUSTOM_ML_FALLBACK_TO_GEMINI` | `true` | Infra-failure fallback (never for a bad/oversized/unsupported image) |
+
+Phase 2 documentation:
+- **[`docs/PHASE_2_CUSTOM_DISEASE_ML.md`](docs/PHASE_2_CUSTOM_DISEASE_ML.md)** — authoritative architecture/overview
+- **[`docs/CUSTOM_ML_RUNBOOK.md`](docs/CUSTOM_ML_RUNBOOK.md)** — exact local setup and troubleshooting
+- **[`docs/CUSTOM_ML_LIMITATIONS.md`](docs/CUSTOM_ML_LIMITATIONS.md)** — full, honest limitations (dataset, metrics, confidence, system, safety)
+- **[`docs/CUSTOM_ML_E2E_VALIDATION.md`](docs/CUSTOM_ML_E2E_VALIDATION.md)** — real end-to-end validation results (M10)
+- **[`docs/CUSTOM_ML_RESULT_SCHEMA.md`](docs/CUSTOM_ML_RESULT_SCHEMA.md)** — persisted MongoDB / API response schema
+- **[`docs/PHASE_2_SIGN_OFF.md`](docs/PHASE_2_SIGN_OFF.md)** — formal Phase 2 sign-off record
 
 ## 📂 Project Structure
 

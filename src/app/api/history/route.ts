@@ -35,6 +35,15 @@ export async function GET(request: NextRequest) {
     ]);
 
     return NextResponse.json({
+      // Milestone M9: customMl/providerMetadata/secondaryOpinion/
+      // resultVersion are read straight through with the exact same field
+      // names persisted by route.ts's buildDiseaseAnalysisPersistenceInput
+      // (see persistence.ts) -- never renamed or reshaped here, so the
+      // immediate analyze response and this history response can never
+      // describe the same record differently. All four are `undefined` on
+      // pre-M9 documents (and on any non-disease-analysis document) and
+      // simply drop out of the JSON response rather than rendering as
+      // null/empty objects.
       analyses: analyses.map((a) => ({
         id: a._id,
         type: a.type,
@@ -44,8 +53,13 @@ export async function GET(request: NextRequest) {
         confidence: a.result?.confidence,
         treatment: a.result?.treatment,
         prevention: a.result?.prevention,
+        expertAdvice: a.result?.expertAdvice,
         cropName: a.cropName,
         aiProvider: a.aiProvider,
+        customMl: a.customMl,
+        providerMetadata: a.providerMetadata,
+        secondaryOpinion: a.secondaryOpinion,
+        resultVersion: a.resultVersion,
         createdAt: a.createdAt,
       })),
       pagination: {

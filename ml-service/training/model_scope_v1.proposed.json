@@ -1,0 +1,23 @@
+{
+  "status": "proposed_not_approved",
+  "_comment": "PROVISIONAL PROPOSAL ONLY. Not an approved configuration. Does not affect training/training/class_map.json, which continues to record the original 8 approved dataset classes unmodified. This file exists to represent a possible reduced first-model scope for later, separate approval -- see the M3B planning report and ml-service/docs/DATASET_PROVENANCE.md for the evidence basis.",
+  "original_available_classes": 8,
+  "proposed_first_model_classes": [
+    "Tomato Healthy",
+    "Tomato Early Blight",
+    "Tomato Late Blight",
+    "Potato Healthy",
+    "Potato Early Blight",
+    "Potato Late Blight"
+  ],
+  "proposed_first_model_class_count": 6,
+  "temporarily_excluded_classes": [
+    "Corn Healthy",
+    "Corn Common Rust"
+  ],
+  "exclusion_reason": "No defensible physical-leaf grouping metadata exists for either Corn class in the approved upstream source: leaf-map.json contains zero entries for Corn, and the leaf_grouping/filtered_leafmaps and leaf_grouping/leaf_maps source directories contain zero Corn-related files of any kind (verified by direct inspection, not inferred). Corn Common Rust filenames additionally carry no usable grouping signal at all (1,192 sequential, non-repeating numbers). Grouping either Corn class would require either a singleton fallback (rejected as unsafe -- see M3B plan section 2) or fabricated grouping metadata, both excluded by project ML safety rules.",
+  "approval_status_of_this_scope": "NOT APPROVED. This file is a proposal artifact only, generated during M3B-2A per explicit instruction. Formal approval, if granted, will be recorded as a separate, explicit decision -- this file's existence does not itself constitute approval.",
+  "relationship_to_class_map_json": "training/class_map.json is NOT modified by this file and continues to define all 8 originally approved classes. This proposed scope is a training-time filter to be applied later, if approved, not a redefinition of the approved class list.",
+  "tomato_filename_grouping_status": "The 3 included Tomato classes still have 1,582 quarantined images whose proposed filename-family grouping rules received only AI-assisted preliminary review (review_type: preliminary_ai_review) during M3B-2A -- NOT final human approval. No filename group is eligible for train/validation/test use yet. The 6 largest Tomato Late Blight groups (size >= 10) additionally require explicit individual human review before any sign-off. Final approval of these rules belongs to the user during Milestone M3B-2. See ml-service/data/reports/tomato_filename_rule_proposal.json and ml-service/data/reports/tomato_filename_group_review_summary.json (gitignored) and ml-service/docs/DATASET_PROVENANCE.md for detail.",
+  "source_milestone": "M3B-2A"
+}

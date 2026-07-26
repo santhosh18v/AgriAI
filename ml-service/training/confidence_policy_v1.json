@@ -1,0 +1,39 @@
+{
+  "achieved_validation_coverage": 0.999000999000999,
+  "achieved_validation_selective_accuracy": 0.994,
+  "achieved_validation_selective_macro_f1": 0.994924506387921,
+  "checkpoint_sha256": "24e7244ed2970ec3aac50be870f0de80f42d52baf30cd80b429ff67e9d001081",
+  "confidence_method": "maximum_softmax_probability",
+  "created_at_utc": "2026-07-26T04:17:45Z",
+  "decision_source": "predeclared_rule_applied_to_validation_predictions_only",
+  "limitations": [
+    "Potato Healthy validation support is 24 images from only 6 independent physical-leaf groups; its threshold statistics carry high uncertainty and are not claimed to be production-calibrated.",
+    "Threshold selection used one single global threshold across all 6 classes; no class-specific threshold was selected in M5.",
+    "Candidate grid is a fixed 0.50-0.99 step-0.01 grid, not every unique observed confidence value.",
+    "Softmax confidence is a model score, not a guaranteed true probability; it must not be presented as certainty.",
+    "This threshold and model are not production-calibrated; no production-readiness claim is made."
+  ],
+  "mandatory_constraints": {
+    "min_accepted_accuracy": 0.99,
+    "min_overall_coverage": 0.9,
+    "min_per_class_accepted_count": 15,
+    "min_per_class_coverage": 0.8
+  },
+  "model_architecture": "efficientnet_b0",
+  "per_class_validation_coverage": {
+    "Potato Early Blight": 1.0,
+    "Potato Healthy": 1.0,
+    "Potato Late Blight": 1.0,
+    "Tomato Early Blight": 0.9933774834437086,
+    "Tomato Healthy": 1.0,
+    "Tomato Late Blight": 1.0
+  },
+  "selected_threshold": 0.5,
+  "selection_dataset": "validation",
+  "selection_rule": "Predeclared before viewing test labels. Candidate grid: fixed values 0.50-0.99 in steps of 0.01 (50 candidates), evaluated on validation predictions only. A threshold passes iff: accepted accuracy >= 99.0%, overall coverage >= 90%, every class retains >= 80% coverage, every class retains >= 15 accepted validation images, and no class has zero accepted support. Among passing thresholds, select by: (1) highest overall coverage, (2) tie-break higher selective macro-F1, (3) then lower threshold, (4) then deterministic numeric ordering. If no threshold passes, no threshold is selected; the Pareto frontier over (coverage, selective accuracy) is reported instead for explicit user review.",
+  "statement": "Test labels were not used, read, or referenced at any point during threshold selection. Threshold selection used validation predictions only.",
+  "status": "approved_for_test_application",
+  "test_labels_used_for_threshold_selection": false,
+  "validation_manifest_sha256": "85f86dec9e81566b19d0654559f6b56c11d4b7086f3d5b8d244e00cae91dd91f",
+  "version": 1
+}
