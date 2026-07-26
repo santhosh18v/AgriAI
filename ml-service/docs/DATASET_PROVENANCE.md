@@ -685,11 +685,17 @@ whenever Potato Healthy is included. The 3 similarity guards are a
 split-safety constraint only and do not assert that guarded images share
 one physical leaf.
 
-**M4 (model training) status**: underway, using these manifests unchanged
+**M4 (model training) status**: complete, using these manifests unchanged
 as its frozen train/validation input. Training configuration, commands,
 and results are documented separately in
 **[`MODEL_TRAINING.md`](MODEL_TRAINING.md)** — not duplicated here.
-`test.csv` remains untouched by M4; final test evaluation is M5.
+`test.csv` remained untouched by M4.
+
+**M5 (model evaluation) status**: complete. `test.csv` has now been
+evaluated exactly once against the frozen M4 checkpoint, using a confidence
+threshold selected from validation predictions only. Full results,
+limitations, and reproduction commands are in
+**[`MODEL_EVALUATION.md`](MODEL_EVALUATION.md)**.
 
 ## Storage location
 

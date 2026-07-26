@@ -88,20 +88,16 @@ cd ml-service
 original required list) used to run fast smoke tests without touching the
 real baseline's output directory.
 
-## Validation-only evaluation command (val.csv only)
+## Validation and final-test evaluation (M5)
 
-```bash
-.venv/bin/python3 training/evaluate.py \
-  --checkpoint data/training-runs/m4-efficientnet-b0-seed42/best_model.pt \
-  --manifest data/splits/val.csv \
-  --class-map training/class_map.json \
-  --model-scope training/model_scope_v1.json \
-  --output-json data/training-runs/m4-efficientnet-b0-seed42/evaluate_val_rerun.json
-```
-
-`evaluate.py` refuses `test.csv` unconditionally — there is no flag in
-this program that enables test-set evaluation. That is explicit, separate
-M5 scope.
+`training/evaluate.py` was extended in Milestone M5 with explicit
+`--mode validation` / `--mode final-test` support, manifest/checkpoint
+SHA-256 verification, and a required `--confirm-final-test-evaluation`
+acknowledgement for the one-time frozen test evaluation. The M4-era
+single-file `--output-json` interface shown in earlier revisions of this
+document no longer exists. Commands, the validation-selected confidence
+threshold, and the frozen test results are documented in
+**[`MODEL_EVALUATION.md`](MODEL_EVALUATION.md)** — not duplicated here.
 
 ## Resume command
 
@@ -200,8 +196,10 @@ the limitation is disclosed, not worked around.
 
 **`test.csv` was not loaded anywhere in M4** — not for training, not for
 validation, not for early stopping, not for model selection, not for
-threshold selection. It remains frozen. M5 will perform the final test
-evaluation and threshold selection as separate, explicit work.
+threshold selection. Milestone M5 subsequently performed the one-time final
+test evaluation and validation-only threshold selection; see
+[`MODEL_EVALUATION.md`](MODEL_EVALUATION.md). `test.csv` has now been
+evaluated exactly once and must not be evaluated again.
 
 ## Reproducibility disclosure
 
