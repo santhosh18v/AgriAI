@@ -1,0 +1,34 @@
+# Keep the build context small and never send local secrets, datasets,
+# virtual envs, or generated artifacts to the Docker daemon.
+
+.venv/
+venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+
+# datasets, split manifests, trained checkpoints, evaluation runs -- the
+# checkpoint is bind-mounted at run time instead (see ../docker-compose.yml)
+data/
+models/
+*.pt
+*.pth
+*.onnx
+
+# local env files -- never baked into the image
+.env
+.env.example
+
+# docs / non-runtime files
+README.md
+docs/
+model_manifest.example.json
+requirements-training.txt
+tests/
+
+# vcs / os / editor cruft
+.git/
+.gitignore
+.DS_Store
+.vscode/
+.idea/

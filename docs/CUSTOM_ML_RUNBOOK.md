@@ -100,6 +100,95 @@ Do not bind to `0.0.0.0`. Expect a log line confirming the model loaded
 (architecture, class count, device, duration) before "Application startup
 complete."
 
+## 7B. Alternative: run FastAPI in Docker instead of a venv
+
+Once the checkpoint exists locally (step 7B-1), Docker Compose can run
+the ml-service instead of steps 2–3 and 7 — no manual venv activation or
+`uvicorn` command needed day to day.
+
+**Prerequisites:** Docker Desktop (or another Docker Engine +
+`docker compose`) running locally; ~2 GB free disk for the image (CPU-only
+PyTorch, no CUDA).
+
+**7B-1. Obtain and place the checkpoint.** This file is gitignored and not
+part of the repository, same as the venv path (step 3/"Model checkpoint
+missing" below) — get it from wherever your team stores trained
+checkpoints and place it at:
+
+```
+ml-service/data/training-runs/m4-efficientnet-b0-seed42/best_model.pt
+```
+
+**7B-2. Confirm its SHA-256** matches the value recorded in
+`ml-service/training/confidence_policy_v1.json`
+(`checkpoint_sha256`) — this is the same hash the service itself verifies
+automatically at startup (native or Docker) before it will report ready:
+
+```bash
+shasum -a 256 ml-service/data/training-runs/m4-efficientnet-b0-seed42/best_model.pt
+```
+
+**7B-3. Start it** (from the repo root):
+
+```bash
+docker compose up -d ml-service
+```
+
+This builds `ml-service/Dockerfile` (see that file for what's baked in vs.
+bind-mounted) and starts a container listening on `0.0.0.0:8001` inside
+Docker, published to the host as `127.0.0.1:8001` — identical from
+Next.js's point of view to the native `uvicorn` command in step 7. The
+checkpoint is bind-mounted read-only from the path above; it is never
+copied into the image or committed. The confidence policy, class map, and
+model scope JSON files are tracked in git and are baked into the image.
+
+**Logs:**
+
+```bash
+docker compose logs -f ml-service
+```
+
+Expect the same "Model loaded successfully" line as the native startup,
+followed by `Uvicorn running on http://0.0.0.0:8001`.
+
+**Status / health:**
+
+```bash
+docker compose ps                       # STATUS column shows "healthy" once /api/ready succeeds
+docker compose exec ml-service python -c "import torch; print(torch.backends.mps.is_available())"  # always False in Docker
+```
+
+**Stop / restart:**
+
+```bash
+docker compose stop ml-service          # stop the container, keep it for next `up -d`
+docker compose restart ml-service       # restart in place; the model reloads from the mounted checkpoint
+docker compose down                     # remove the ml-service container (and its network); does not touch agriai-mongodb
+```
+
+**CPU vs. MPS:** the Docker container always runs on CPU
+(`AGRI_ML_PREFERRED_DEVICE=cpu` is set in `docker-compose.yml`) — Linux
+containers on Apple Silicon cannot use macOS's Metal/MPS API. The native
+venv command in step 7 can still use MPS (`preferred_device: auto` picks
+it up automatically on a Mac). Predictions are functionally equivalent
+either way; inference latency differs (MPS is faster). No CUDA/GPU is
+required in either mode.
+
+**Docker-specific troubleshooting:** see also the shared entries below
+("Model checkpoint missing", "Readiness returns 503", "Port 8001 already
+in use").
+
+- **Container immediately unhealthy / `/api/ready` returns 503** — almost
+  always the checkpoint bind mount is missing or points at the wrong file
+  (see 7B-1/7B-2), or the SHA-256 doesn't match the confidence policy.
+  Check `docker compose logs ml-service` for the sanitized failure reason.
+- **`docker compose up` fails to build** — confirm Docker Desktop has
+  network access to `download.pytorch.org` and `pypi.org` (the build
+  installs a CPU-only PyTorch wheel explicitly, to avoid pulling
+  CUDA-bundled Linux wheels).
+- **Port 8001 already in use** — a native `uvicorn` process (step 7) is
+  probably already running; stop one or the other, don't run both at once.
+
 ## 8. Verify health/readiness/model-info
 
 ```bash
@@ -112,6 +201,10 @@ Expect: `/api/health` → `{"status":"ok",...}`; `/api/ready` →
 `{"status":"ready","model_loaded":true,"confidence_policy_loaded":true,"class_count":6}`;
 `/api/model-info` → `class_count: 6`, `threshold: 0.5`,
 `production_calibrated: false`.
+
+These checks are identical whether the service is running natively (step
+7) or in Docker (step 7B) — `docker compose` publishes the same
+`127.0.0.1:8001` address.
 
 ## 9. Start Next.js in Gemini mode (default)
 
@@ -170,8 +263,12 @@ Or through the UI at `/dashboard/history`.
 ## 14. Stop services
 
 - Next.js: `Ctrl+C` in its terminal (or `kill <pid>`).
-- FastAPI: `Ctrl+C` in its terminal (or `kill <pid>`).
-- MongoDB (Docker): `docker stop agriai-mongodb` — only stop it if you started it yourself for this session; don't stop a container other developers/services depend on.
+- FastAPI (native, step 7): `Ctrl+C` in its terminal (or `kill <pid>`).
+- FastAPI (Docker, step 7B): `docker compose stop ml-service` (or
+  `docker compose down` to also remove the container/network — see 7B for
+  details). Never run the native and Docker FastAPI at the same time; both
+  bind `127.0.0.1:8001`.
+- MongoDB (Docker): `docker stop agriai-mongodb` — only stop it if you started it yourself for this session; don't stop a container other developers/services depend on. `docker compose down`/`up` for `ml-service` never starts, stops, or otherwise touches `agriai-mongodb`.
 
 ## Troubleshooting
 
