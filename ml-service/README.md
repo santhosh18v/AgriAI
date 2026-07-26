@@ -106,6 +106,14 @@ source .venv/bin/activate
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ```
 
+Or, via Docker (no venv activation needed day to day; see
+`Dockerfile`/`../docker-compose.yml` and the runbook's step 7B for
+checkpoint placement, CPU-vs-MPS behavior, and troubleshooting):
+
+```bash
+docker compose up -d ml-service   # from the repo root
+```
+
 See the repo root's **[`docs/CUSTOM_ML_RUNBOOK.md`](../docs/CUSTOM_ML_RUNBOOK.md)**
 for the complete local-startup runbook covering this service, MongoDB, and
 Next.js together, including troubleshooting.

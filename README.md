@@ -101,6 +101,21 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 npm run dev
 ```
 
+**Or, Dockerized (optional, recommended for daily local use)** — the
+FastAPI service can run in Docker instead of a manually-activated virtual
+environment; it is still reachable at the same `http://127.0.0.1:8001`:
+
+```bash
+docker compose up -d     # builds and starts the ml-service container
+npm run dev               # Next.js stays on the host, unchanged
+```
+
+MongoDB is not managed by `docker compose` here — it keeps running as its
+own `agriai-mongodb` container (see
+[`docs/CUSTOM_ML_RUNBOOK.md`](docs/CUSTOM_ML_RUNBOOK.md)). See that runbook
+for checkpoint placement/SHA-256 verification, Docker prerequisites,
+logs/health checks, and CPU-vs-MPS behavior.
+
 | Variable | Default | Meaning |
 |---|---|---|
 | `DISEASE_ANALYSIS_PROVIDER` | `gemini` | `"gemini"` or `"custom-ml"` |
